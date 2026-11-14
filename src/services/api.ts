@@ -98,6 +98,7 @@ export const fetchArticles = async (
       .from('articles')
       .select('*')
       .eq('constitution_id', constitutionId)
+      .eq('active', true)
       .order('ord', { ascending: true, nullsFirst: false });
     if (error) throw error;
     if (!data || data.length === 0) return bundled;
@@ -117,6 +118,7 @@ export const fetchAllArticles = async (): Promise<Article[]> => {
       const { data, error } = await supabase
         .from('articles')
         .select('*')
+        .eq('active', true)
         .order('constitution_id', { ascending: true })
         .order('ord', { ascending: true, nullsFirst: false })
         .range(from, from + PAGE_SIZE - 1);

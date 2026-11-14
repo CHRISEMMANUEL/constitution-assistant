@@ -396,6 +396,18 @@ export const Layout: React.FC = () => {
           <p>
             {t('footer.copyright', { year: new Date().getFullYear() })}
           </p>
+
+          <p className="text-[10px] sm:text-xs opacity-80">
+            {t('footer.design_by')}{' '}
+            <a
+              href="https://chrisemmanuel.github.io/Emmanuel-Chris/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-iris-500 transition-colors"
+            >
+              Emmanuel Chris
+            </a>
+          </p>
         </div>
       </footer>
     </div>

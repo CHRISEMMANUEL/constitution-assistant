@@ -1,16 +1,14 @@
 name: Seed constitutional data
 
-# Refreshes Supabase from the Constitute Project + Wikipedia weekly.
-# Idempotent — upserts replace changed text; manual runs are safe.
+# Refreshes Supabase from the Constitute Project + Wikipedia. Manual runs only:
+# the weekly schedule is off while constitution texts move to official sources.
+# Rows from a better source are never replaced or deleted; stale rows are soft-hidden (active = false).
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   VITE_SUPABASE_URL          your project URL, e.g. https://xxx.supabase.co
 #   SUPABASE_SERVICE_ROLE_KEY  service_role key (NOT anon). Bypasses RLS.
 
 on:
-  schedule:
-    # Sunday 03:00 UTC. Cron is in UTC. Adjust if you prefer another time.
-    - cron: '0 3 * * 0'
   workflow_dispatch:
     # Adds a "Run workflow" button on the Actions tab for ad-hoc refreshes.
 

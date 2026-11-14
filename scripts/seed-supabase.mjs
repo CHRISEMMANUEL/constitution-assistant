@@ -388,22 +388,80 @@ async function upsertConstitution(row) {
   return error;
 }
 
-async function replaceArticles(constitutionId, rows) {
-  for (let i = 0; i < rows.length; i += 50) {
-    const chunk = rows.slice(i, i + 50);
+const SOURCE_RANK = { official: 4, constitute: 3, wikipedia: 2, generated: 1, manual: 0 };
+
+const SOURCE_META = {
+  constitute: {
+    source_name: 'Constitute Project',
+    source_url: 'https://www.constituteproject.org',
+    license: 'CC BY-NC 3.0',
+    language: 'en',
+    official_translation: false,
+  },
+  wikipedia: {
+    source_name: 'Wikipedia',
+    source_url: 'https://en.wikipedia.org',
+    license: 'CC BY-SA 4.0',
+    language: 'en',
+    official_translation: null,
+  },
+  generated: {
+    source_name: null,
+    source_url: null,
+    license: null,
+    language: 'en',
+    official_translation: null,
+  },
+};
+
+async function topActiveSource(constitutionId) {
+  const { data, error } = await supabaseWithRetry(() =>
+    sb
+      .from('articles')
+      .select('source')
+      .eq('constitution_id', constitutionId)
+      .eq('active', true),
+  );
+  if (error) throw new Error(error.message);
+  let best = null;
+  for (const { source } of data) {
+    if (best === null || (SOURCE_RANK[source] ?? 0) > (SOURCE_RANK[best] ?? 0)) {
+      best = source;
+    }
+  }
+  return best;
+}
+
+async function replaceArticles(constitutionId, source, rows) {
+  const tagged = rows.map((r) => ({ ...r, source, active: true }));
+  for (let i = 0; i < tagged.length; i += 50) {
+    const chunk = tagged.slice(i, i + 50);
     const { error } = await supabaseWithRetry(() =>
       sb.from('articles').upsert(chunk),
     );
     if (error) return error;
   }
-  const { error: dErr } = await supabaseWithRetry(() =>
+  const { error: sErr } = await supabaseWithRetry(() =>
     sb
       .from('articles')
-      .delete()
+      .update({ active: false })
       .eq('constitution_id', constitutionId)
+      .eq('source', source)
       .gte('ord', rows.length),
   );
-  return dErr || null;
+  if (sErr) return sErr;
+  const lower = Object.keys(SOURCE_RANK).filter(
+    (s) => SOURCE_RANK[s] < SOURCE_RANK[source],
+  );
+  if (lower.length === 0) return null;
+  const { error: lErr } = await supabaseWithRetry(() =>
+    sb
+      .from('articles')
+      .update({ active: false })
+      .eq('constitution_id', constitutionId)
+      .in('source', lower),
+  );
+  return lErr || null;
 }
 
 async function main() {
@@ -422,6 +480,7 @@ async function main() {
   let withWiki = 0;
   let withProfileOnly = 0;
   let articlesWritten = 0;
+  let kept = 0;
   let failed = 0;
   const needsRetry = [];
 
@@ -477,6 +536,18 @@ async function main() {
       }
     }
 
+    const runSource = parsedArticles ? 'constitute' : wiki ? 'wikipedia' : 'generated';
+    let existingSource = null;
+    try {
+      existingSource = await topActiveSource(id);
+    } catch (err) {
+      console.log(`✗ source check: ${err.message}`);
+      return { status: 'failed', hadNetworkError: true, constituteAvailable: !!cMatch, articlesAdded: 0 };
+    }
+    const keepExisting =
+      existingSource !== null &&
+      (SOURCE_RANK[existingSource] ?? 0) > SOURCE_RANK[runSource];
+
     const constitutionRow = {
       id,
       country,
@@ -484,13 +555,14 @@ async function main() {
       flag: c.flag,
       region,
       title: `Constitution of ${country}`,
-      adopted,
-      summary,
       capital,
       population,
       languages,
       subregion,
       flag_image_url: flagImage,
+      ...(keepExisting
+        ? {}
+        : { adopted, summary, ...SOURCE_META[runSource], retrieved_at: new Date().toISOString() }),
     };
     const cErr = await upsertConstitution(constitutionRow);
     if (cErr) {
@@ -507,6 +579,11 @@ async function main() {
       return { status: 'failed', hadNetworkError: isNetwork, constituteAvailable: !!cMatch, articlesAdded: 0 };
     }
 
+    if (keepExisting) {
+      console.log(`↷ kept ${existingSource} text (this run only got ${runSource})`);
+      return { status: 'kept', hadNetworkError, constituteAvailable: !!cMatch, articlesAdded: 0 };
+    }
+
     if (parsedArticles) {
       const rows = parsedArticles.map((a) => ({
         id: `${id}-cp-${String(a.ord).padStart(3, '0')}`,
@@ -517,7 +594,7 @@ async function main() {
         content: a.content,
         ord: a.ord,
       }));
-      const err = await replaceArticles(id, rows);
+      const err = await replaceArticles(id, 'constitute', rows);
       if (err) {
         console.log(`✗ articles: ${err.message}`);
         const isNetwork = /fetch failed|network|timeout/i.test(err.message || '');
@@ -537,7 +614,7 @@ async function main() {
         content: `${wiki.extract}\n\nSource: ${wiki.url}`,
         ord: 0,
       };
-      const err = await replaceArticles(id, [overview]);
+      const err = await replaceArticles(id, 'wikipedia', [overview]);
       if (err) {
         console.log(`profile ✓ article ✗ (${err.message})`);
         const isNetwork = /fetch failed|network|timeout/i.test(err.message || '');
@@ -570,7 +647,7 @@ async function main() {
         `For the latest constitutional information, see https://en.wikipedia.org/wiki/Constitution_of_${encodeURIComponent(country.replace(/\s+/g, '_'))}.`,
       ord: 0,
     };
-    const err = await replaceArticles(id, [profile]);
+    const err = await replaceArticles(id, 'generated', [profile]);
     if (err) {
       console.log(`profile ✗ (${err.message})`);
       const isNetwork = /fetch failed|network|timeout/i.test(err.message || '');
@@ -593,6 +670,8 @@ async function main() {
     } else if (status === 'profile') {
       withProfileOnly += sign;
       articlesWritten += sign * articlesAdded;
+    } else if (status === 'kept') {
+      kept += sign;
     } else if (status === 'failed') {
       failed += sign;
     }
@@ -637,6 +716,7 @@ async function main() {
   console.log(`Indexed via Wikipedia overview:   ${withWiki}`);
   console.log(`Indexed via country profile only: ${withProfileOnly}`);
   console.log(`Total article rows written:       ${articlesWritten}`);
+  console.log(`Kept better existing source:      ${kept}`);
   console.log(`Failed:                           ${failed}`);
   console.log('='.repeat(64));
   console.log(

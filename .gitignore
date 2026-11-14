@@ -78,3 +78,6 @@ $RECYCLE.BIN/
 .DEPLOY.md
 # Supabase CLI local cache
 supabase/.temp/
+
+# Local database backups (contain user data)
+backups/

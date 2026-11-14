@@ -19,6 +19,14 @@ alter table public.constitutions
   add column if not exists subregion       text,
   add column if not exists flag_image_url  text;
 
+alter table public.constitutions
+  add column if not exists source_name           text,
+  add column if not exists source_url            text,
+  add column if not exists license               text,
+  add column if not exists language              text,
+  add column if not exists official_translation  boolean,
+  add column if not exists retrieved_at          timestamptz;
+
 create table if not exists public.articles (
   id                text primary key,
   constitution_id   text not null references public.constitutions(id) on delete cascade,
@@ -36,10 +44,17 @@ create index if not exists articles_constitution_idx
 create index if not exists articles_constitution_ord_idx
   on public.articles (constitution_id, ord);
 
+alter table public.articles
+  add column if not exists source  text not null default 'manual',
+  add column if not exists active  boolean not null default true;
+
+create index if not exists articles_constitution_active_ord_idx
+  on public.articles (constitution_id, active, ord);
+
 create table if not exists public.bookmarks (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users(id) on delete cascade,
-  article_id  text not null references public.articles(id) on delete cascade,
+  article_id  text not null references public.articles(id) on delete restrict,
   note        text,
   created_at  timestamptz not null default now(),
   unique (user_id, article_id)

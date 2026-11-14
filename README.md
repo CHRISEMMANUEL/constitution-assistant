@@ -66,7 +66,13 @@ Without Supabase credentials the app runs on the bundled constitutions only.
    - the small starter set in [supabase/seed.sql](supabase/seed.sql), or
    - the full corpus: `npm run seed:supabase` (needs `SUPABASE_SERVICE_ROLE_KEY` in `.env`).
 
-The GitHub Actions workflow [.github/workflows/seed.yml](.github/workflows/seed.yml) re-runs the full seed weekly. It needs the repository secrets `VITE_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+Existing databases created before November 2026 also need [supabase/migrations/20261114_source_provenance.sql](supabase/migrations/20261114_source_provenance.sql). It adds source and licence columns, an `articles.active` flag, and changes bookmarks so deleting a bookmarked article is refused instead of silently removing the bookmark. Apply it before deploying a frontend that filters on `active`.
+
+Every article row records its `source` (`official`, `constitute`, `wikipedia`, `generated`, `manual`). The seed never replaces a higher-ranked source and never deletes rows; rows it supersedes get `active = false`.
+
+Back up the data before any bulk change: `npm run backup:supabase` writes JSON copies of every table to `backups/` (gitignored).
+
+The GitHub Actions workflow [.github/workflows/seed.yml](.github/workflows/seed.yml) runs the full seed on demand from the Actions tab. It needs the repository secrets `VITE_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### AI proxy (Supabase Edge Function)
 
