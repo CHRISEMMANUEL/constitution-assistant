@@ -72,6 +72,17 @@ Every article row records its `source` (`official`, `constitute`, `wikipedia`, `
 
 Back up the data before any bulk change: `npm run backup:supabase` writes JSON copies of every table to `backups/` (gitignored).
 
+#### Official texts
+
+[scripts/sources.json](scripts/sources.json) lists, per country code, where the official text comes from, its licence, and checks the parsed result must pass (article count range, required articles, no gaps in numbering). Countries marked `blocked` give the reason and keep their current source.
+
+```bash
+npm run import:official -- us au ke          # dry run: fetch, parse, validate, write official-out/<id>.json
+npm run import:official -- us au ke --write  # save to Supabase as source 'official'
+```
+
+With no country codes it runs every `ready` entry. A country that fails validation is never written. On `--write` the official rows are saved first, then the older rows for that country are set to `active = false` (never deleted), and the constitution's source, licence and summary are updated. Official row ids are `<code>-of-<article-slug>`, for example `us-of-amendment-xiv-section-1`. Each source has its own parser in [scripts/official/adapters.mjs](scripts/official/adapters.mjs).
+
 The GitHub Actions workflow [.github/workflows/seed.yml](.github/workflows/seed.yml) runs the full seed on demand from the Actions tab. It needs the repository secrets `VITE_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### AI proxy (Supabase Edge Function)
@@ -91,7 +102,8 @@ The frontend is a static build (`npm run build`, output in `dist/`) deployed on 
 
 ## Data sources and attribution
 
-- **Constitution texts**: [Constitute](https://www.constituteproject.org). Elkins, Zachary, Tom Ginsburg, James Melton. *Constitute: The World's Constitutions to Read, Search, and Compare.* Online at constituteproject.org. Licensed under [CC BY-NC 3.0](https://creativecommons.org/licenses/by-nc/3.0/); commercial use of this content is not permitted. Some English translations are provided to Constitute by HeinOnline and Oxford Constitutions of the World.
+- **Official constitution texts**: for the countries marked `ready` in [scripts/sources.json](scripts/sources.json), taken from official publications (for example the U.S. National Archives, and official prints transcribed on [Wikisource](https://en.wikisource.org)). Each country page in the Explorer shows its source and licence.
+- **Other constitution texts**: [Constitute](https://www.constituteproject.org). Elkins, Zachary, Tom Ginsburg, James Melton. *Constitute: The World's Constitutions to Read, Search, and Compare.* Online at constituteproject.org. Licensed under [CC BY-NC 3.0](https://creativecommons.org/licenses/by-nc/3.0/); commercial use of this content is not permitted. Some English translations are provided to Constitute by HeinOnline and Oxford Constitutions of the World.
 - **Country summaries**: [Wikipedia](https://en.wikipedia.org), under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - **Country metadata**: [REST Countries](https://restcountries.com).
 - **Bundled offline set**: excerpts from official public-domain constitutional texts.

@@ -293,6 +293,24 @@ export const Explorer: React.FC = () => {
                 {activeConstitution.title}
               </p>
             )}
+            {activeConstitution.indexed && activeConstitution.source_name && (
+              <p className="text-[11px] sm:text-xs text-slate dark:text-mist mt-1">
+                {t('explorer.source')}{' '}
+                {activeConstitution.source_url ? (
+                  <a
+                    href={activeConstitution.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-iris-500 transition-colors"
+                  >
+                    {activeConstitution.source_name}
+                  </a>
+                ) : (
+                  activeConstitution.source_name
+                )}
+                {activeConstitution.license && ` · ${activeConstitution.license}`}
+              </p>
+            )}
           </div>
         </div>
       )}

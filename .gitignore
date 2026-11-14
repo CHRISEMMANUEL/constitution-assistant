@@ -81,3 +81,6 @@ supabase/.temp/
 
 # Local database backups (contain user data)
 backups/
+
+# Dry-run output of npm run import:official
+official-out/

@@ -15,6 +15,12 @@ export interface Constitution extends BundledConstitution {
   population?: number;
   languages?: string[];
   subregion?: string;
+  source_name?: string | null;
+  source_url?: string | null;
+  license?: string | null;
+  language?: string | null;
+  official_translation?: boolean | null;
+  retrieved_at?: string | null;
 }
 export interface Article extends BundledArticle {}
 export type { Region };

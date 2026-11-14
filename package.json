@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "seed:supabase": "node scripts/seed-supabase.mjs",
-    "backup:supabase": "node scripts/backup-supabase.mjs"
+    "backup:supabase": "node scripts/backup-supabase.mjs",
+    "import:official": "node scripts/import-official.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.53.1",

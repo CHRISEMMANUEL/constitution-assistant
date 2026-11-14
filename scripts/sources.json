@@ -1,0 +1,73 @@
+{
+  "us": {
+    "status": "ready",
+    "adapter": "us-archives",
+    "pages": [
+      "https://www.archives.gov/founding-docs/constitution-transcript",
+      "https://www.archives.gov/founding-docs/bill-of-rights-transcript",
+      "https://www.archives.gov/founding-docs/amendments-11-27"
+    ],
+    "source_name": "U.S. National Archives",
+    "source_url": "https://www.archives.gov/founding-docs/constitution",
+    "license": "Public domain (U.S. Government work)",
+    "language": "en",
+    "official_translation": null,
+    "expect": {
+      "min": 50,
+      "max": 80,
+      "contains": ["Preamble", "Article I, Section 8", "Article V", "Amendment I", "Amendment XIV, Section 1", "Amendment XXVII"]
+    }
+  },
+  "au": {
+    "status": "ready",
+    "adapter": "au-wikisource",
+    "pages": ["Commonwealth of Australia Constitution Act (2013)"],
+    "source_name": "Commonwealth of Australia Constitution Act, compilation as at 2013 (Federal Register of Legislation, transcribed on Wikisource)",
+    "source_url": "https://www.legislation.gov.au/C2004Q00685/latest/text",
+    "license": "CC BY 4.0 (Commonwealth of Australia)",
+    "language": "en",
+    "official_translation": null,
+    "expect": {
+      "min": 130,
+      "max": 145,
+      "contains": ["Preamble", "Covering clause 9", "Section 105A", "Schedule"],
+      "sequence": { "prefix": "Section ", "from": 1, "to": 128 }
+    }
+  },
+  "ke": {
+    "status": "ready",
+    "adapter": "ke-wikisource",
+    "pages": ["Constitution of Kenya (2010)"],
+    "source_name": "Constitution of Kenya, 2010 (official print, transcribed on Wikisource)",
+    "source_url": "https://new.kenyalaw.org/akn/ke/act/2010/constitution/eng@2010-09-03",
+    "license": "Public domain (written law is excluded from copyright, Kenya Copyright Act 2001)",
+    "language": "en",
+    "official_translation": null,
+    "expect": {
+      "min": 290,
+      "max": 320,
+      "contains": ["Preamble", "Sixth Schedule, section 1"],
+      "sequence": { "prefix": "Article ", "from": 1, "to": 264 }
+    }
+  },
+  "in": {
+    "status": "blocked",
+    "reason": "Wikisource 'Constitution of India (2020)' is missing Articles 10, 221, 237, 254, 273 and 283, so importing it would hide text Constitute has. Needs an adapter for the official legislative.gov.in PDF (times out from here). Keeps Constitute (free tier only)."
+  },
+  "za": {
+    "status": "blocked",
+    "reason": "Wikisource chapter pages predate the 17th (2013) and 18th (2026) amendments, older than the Constitute text. Needs an adapter for gov.za or justice.gov.za. Keeps Constitute (free tier only)."
+  },
+  "ng": {
+    "status": "blocked",
+    "reason": "No reachable official text. Wikisource copy has no source and an unknown version; nass.gov.ng, placng.org and nigeria-law.org time out from here. Keeps Constitute (free tier only)."
+  },
+  "gh": {
+    "status": "blocked",
+    "reason": "Wikisource copy is marked incomplete; judicial.gov.gh times out from here. Keeps Constitute (free tier only)."
+  },
+  "jm": {
+    "status": "blocked",
+    "reason": "Not on Wikisource; laws.moj.gov.jm returns 503 from here. Keeps Constitute (free tier only)."
+  }
+}
