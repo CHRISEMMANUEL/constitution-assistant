@@ -3,13 +3,6 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Search } from 'lucide-react';
 import type { Constitution } from '../services/api';
 
-/**
- * The dropdown menu is rendered via a portal so that ancestor stacking
- * contexts (cards using `backdrop-blur`, sections with their own z-index,
- * etc.) cannot clip or paint over it. The portal position is recomputed
- * on open, on scroll, and on resize so it tracks the trigger.
- */
-
 interface CountryDropdownProps {
   countries: Constitution[];
   value: string | null;
@@ -40,7 +33,6 @@ export const CountryDropdown: React.FC<CountryDropdownProps> = ({
       )
     : countries;
 
-  // Recompute menu position relative to the trigger.
   const reposition = () => {
     if (!triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
@@ -55,7 +47,6 @@ export const CountryDropdown: React.FC<CountryDropdownProps> = ({
     if (open) reposition();
   }, [open]);
 
-  // Close + reposition handlers.
   useEffect(() => {
     if (!open) return;
 

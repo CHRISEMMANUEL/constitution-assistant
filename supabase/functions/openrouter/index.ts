@@ -1,17 +1,3 @@
-// Supabase Edge Function — proxies chat completions to OpenRouter so the
-// API key never ships to the browser. Deploy with:
-//
-//   npx supabase functions deploy openrouter --no-verify-jwt
-//   npx supabase secrets set OPENROUTER_API_KEY=sk-or-v1-...
-//
-// Then in your frontend env (Netlify + local .env):
-//
-//   VITE_OPENROUTER_PROXY_URL=https://<project-ref>.supabase.co/functions/v1/openrouter
-//
-// CORS is permissive ('*') because this endpoint is meant to be called
-// from your Netlify-hosted SPA. Tighten to your specific domain for
-// production by returning a fixed Access-Control-Allow-Origin.
-
 // deno-lint-ignore-file no-explicit-any
 // @ts-ignore — Deno globals only resolve at runtime, not in local TS check.
 declare const Deno: {
@@ -19,23 +5,64 @@ declare const Deno: {
   env: { get: (k: string) => string | undefined };
 };
 
-const ALLOWED_ORIGIN = '*';
+const ALLOWED_ORIGINS = [
+  'https://constitution-assistant.netlify.app',
+  'http://localhost:5173',
+  'http://localhost:4173',
+];
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const MAX_TOKENS = 800;
+const MAX_BODY_CHARS = 60_000;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+const isAllowedOrigin = (origin: string | null): boolean =>
+  !!origin &&
+  (ALLOWED_ORIGINS.includes(origin) ||
+    /^https:\/\/[a-z0-9-]+--constitution-assistant\.netlify\.app$/.test(origin));
+
+const buildCorsHeaders = (origin: string | null): Record<string, string> => ({
+  'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin! : ALLOWED_ORIGINS[0],
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  // Wildcard isn't honoured for credentialed requests, so list the real
-  // headers we accept. Includes OpenRouter attribution headers in case
-  // a client (or future code path) still sends them.
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type, x-title, http-referer, x-requested-with',
   'Access-Control-Max-Age': '86400',
+  Vary: 'Origin',
+});
+
+const jsonError = (
+  corsHeaders: Record<string, string>,
+  status: number,
+  error: string,
+): Response =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
+const sanitizeBody = (raw: string): string | null => {
+  if (raw.length > MAX_BODY_CHARS) return null;
+  let parsed: any;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed?.model !== 'string' || !parsed.model.endsWith(':free')) return null;
+  if (!Array.isArray(parsed.messages) || parsed.messages.length === 0) return null;
+  const requested = Number(parsed.max_tokens);
+  parsed.max_tokens = Number.isFinite(requested) && requested > 0
+    ? Math.min(requested, MAX_TOKENS)
+    : MAX_TOKENS;
+  return JSON.stringify(parsed);
 };
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = buildCorsHeaders(origin);
+
+  if (origin && !isAllowedOrigin(origin)) {
+    return jsonError(corsHeaders, 403, 'Origin not allowed');
+  }
   if (req.method === 'OPTIONS') {
-    // CORS preflight — return empty 204 with the allow-headers spelled out.
     return new Response(null, { status: 204, headers: corsHeaders });
   }
   if (req.method !== 'POST') {
@@ -58,17 +85,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
   }
 
-  let body: string;
+  let raw: string;
   try {
-    body = await req.text();
+    raw = await req.text();
   } catch {
-    return new Response(
-      JSON.stringify({ error: 'Could not read request body' }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
-    );
+    return jsonError(corsHeaders, 400, 'Could not read request body');
+  }
+
+  const body = sanitizeBody(raw);
+  if (!body) {
+    return jsonError(corsHeaders, 400, 'Invalid request: a free (:free) model and a messages array are required');
   }
 
   let upstream: Response;
@@ -98,8 +124,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const upstreamCT = upstream.headers.get('content-type') ?? '';
 
-  // Streaming response (SSE) — pass straight through. Add CORS headers and
-  // strip hop-by-hop headers that confuse fetch in the browser.
   if (upstreamCT.includes('event-stream')) {
     const passthroughHeaders = new Headers();
     for (const [k, v] of upstream.headers) {
@@ -122,9 +146,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   }
 
-  // Non-streaming response. OpenRouter often wraps provider errors as
-  // HTTP 200 with body { error: { code: 429, ... } }. Surface that as the
-  // actual HTTP status so the frontend's model-rotation logic can react.
   const text = await upstream.text();
   let status = upstream.status;
   try {
@@ -134,7 +155,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       status = innerCode;
     }
   } catch {
-    // not JSON — keep upstream status as-is
   }
 
   return new Response(text, {

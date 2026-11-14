@@ -1,39 +1,9 @@
 #!/usr/bin/env node
-/**
- * Seeds Supabase with constitutional data from layered sources:
- *
- *   1. Constitute Project (full text — chapters + articles)
- *      https://www.constituteproject.org/service/
- *   2. Wikipedia REST API (single-paragraph overview, fallback)
- *      https://en.wikipedia.org/api/rest_v1/page/summary/...
- *   3. REST Countries (country metadata for every nation)
- *      https://restcountries.com/v3.1/all
- *
- * Idempotent — re-running upserts changed rows. Safe to schedule
- * (see .github/workflows/seed.yml).
- *
- * Attribution required by Constitute's licence:
- *   Comparative Constitutions Project. English translations used with
- *   permission from HeinOnline and Oxford Constitutions of the World.
- *   Arabic by International IDEA. Spanish by University of Los Andes.
- *
- * Prerequisites:
- *   1. supabase/schema.sql + supabase/seed.sql have been run.
- *   2. SUPABASE_SERVICE_ROLE_KEY is set (Dashboard → Settings → API).
- *      NEVER commit the service role key — it bypasses RLS.
- *
- * Usage (PowerShell):
- *   $env:SUPABASE_SERVICE_ROLE_KEY="ey..."; npm run seed:supabase
- *
- * Usage (bash / GitHub Actions):
- *   SUPABASE_SERVICE_ROLE_KEY=ey... npm run seed:supabase
- */
 
 import fs from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { parse as parseHtml } from 'node-html-parser';
 
-// ---------- Load .env so we can pick up VITE_SUPABASE_URL ----------
 try {
   const dotenv = fs.readFileSync('.env', 'utf-8');
   for (const line of dotenv.split('\n')) {
@@ -43,7 +13,6 @@ try {
     }
   }
 } catch {
-  /* no .env file — fall through */
 }
 
 const SUPABASE_URL =
@@ -65,9 +34,6 @@ const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
 });
 
-// ---------- Key sanity check ----------
-// Decodes the JWT (legacy service_role) or recognises the new sb_secret_*
-// format. Catches the most common mistake: pasting the anon/publishable key.
 function detectKeyRole(key) {
   if (key.startsWith('sb_secret_')) return 'service_role';
   if (key.startsWith('sb_publishable_')) return 'anon';
@@ -95,8 +61,6 @@ if (detectedRole && detectedRole !== 'service_role') {
   process.exit(2);
 }
 
-// ---------- Constants ----------
-
 const CONSTITUTE_BASE = 'https://www.constituteproject.org/service';
 const ATTRIBUTION =
   'Source: Constitute Project (Comparative Constitutions Project). ' +
@@ -108,10 +72,7 @@ const HEADERS = {
   Accept: 'application/json',
 };
 
-// Politeness delay between API calls.
 const DELAY_MS = 220;
-
-// ---------- Region mapping ----------
 
 const MIDEAST_SUBREGIONS = new Set(['Western Asia', 'Middle East']);
 const mapRegion = (region, subregion) => {
@@ -129,13 +90,8 @@ const mapRegion = (region, subregion) => {
   }
 };
 
-// ---------- Helpers ----------
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Retry on transient network failures (TypeError: fetch failed, ECONNRESET,
-// timeouts). Backs off 1.5s → 4s → 9s before giving up. HTTP error
-// statuses (4xx/5xx) are NOT retried — those are passed back to the caller.
 async function fetchWithRetry(url, options = {}, attempts = 3) {
   let lastErr;
   for (let i = 0; i < attempts; i++) {
@@ -152,8 +108,6 @@ async function fetchWithRetry(url, options = {}, attempts = 3) {
   throw lastErr;
 }
 
-// Wraps Supabase calls. supabase-js surfaces network errors via the result
-// object's .error.message rather than throwing, so we have to inspect it.
 async function supabaseWithRetry(fn, attempts = 3) {
   let lastErr;
   for (let i = 0; i < attempts; i++) {
@@ -185,8 +139,6 @@ async function fetchCountries() {
   return await res.json();
 }
 
-// ---------- Constitute Project ----------
-
 let constituteIndex = null;
 
 async function loadConstituteIndex() {
@@ -201,8 +153,6 @@ async function loadConstituteIndex() {
   for (const c of data) {
     if (!c.in_force) continue;
     if (c.is_draft) continue;
-    // Constitute returns translations alongside English originals; skip
-    // entries explicitly tagged with a non-English language.
     const lang = (c.language || '').toLowerCase();
     if (lang && lang !== 'en') continue;
 
@@ -217,9 +167,6 @@ async function loadConstituteIndex() {
   return constituteIndex;
 }
 
-// REST Countries → Constitute country_id matcher.
-// Constitute IDs use country names with underscores; some end in "_the"
-// (e.g. "Netherlands_the"). We try a handful of normalizations.
 function matchToConstitute(restCountry, index) {
   const norm = (s) =>
     s
@@ -235,7 +182,6 @@ function matchToConstitute(restCountry, index) {
     norm(official.replace(/^The /i, '')),
     norm(common) + '_the',
     norm(common.replace(/^The /i, '')) + '_the',
-    // Hard-coded aliases for tricky names. Extend as needed.
     common === 'United States' ? 'United_States_of_America' : null,
     common === 'Czechia' ? 'Czech_Republic' : null,
     common === 'Myanmar' ? 'Myanmar_Burma' : null,
@@ -262,11 +208,6 @@ async function fetchConstituteHtml(consId) {
   return typeof json.html === 'string' && json.html.length > 0 ? json.html : null;
 }
 
-// Walks the Constitute HTML in document order and groups paragraphs under
-// their nearest preceding heading. <h2> sets the chapter; <h3> matching
-// /^Article\s+/ starts a new article; other <h3>s update the chapter.
-// Snap a string to <=70 chars at a word boundary, append ellipsis if cut.
-// Avoids ugly mid-word truncation like "shall have binding for" → "shall have binding force".
 function makeFallbackTitle(text) {
   if (!text) return '';
   const firstSentence = text.split(/[.!?](?:\s|$)/)[0].trim();
@@ -292,14 +233,11 @@ function parseConstitute(html) {
       return;
     }
     if (pendingParas.length === 0) {
-      // Heading with no body content — must be a chapter / part / title divider.
       currentChapter = pendingHeading.replace(/\s+/g, ' ').trim();
       pendingHeading = null;
       return;
     }
     const heading = pendingHeading.replace(/\s+/g, ' ').trim();
-    // Recognise common labels used across constitutions:
-    //   "Article 1", "Section 1", "Sec. 1", "§ 1", "Art. 1"
     const m = heading.match(
       /^(Article|Art\.?|Section|Sec\.?|§)\s*([\d.IVXLCMivxlcm]+\w*)\s*[\-—.:]?\s*(.*)$/i,
     );
@@ -343,40 +281,27 @@ function parseConstitute(html) {
       if (/^preamble$/i.test(text)) {
         pendingHeading = 'Preamble';
       }
-      // don't descend into headings
       return;
     }
     if (tag === 'h3' || tag === 'h4') {
       flush();
       pendingHeading = (node.text || '').trim();
-      // flush() on the NEXT heading will promote this to a chapter if no
-      // body paragraphs follow, or emit it as an article if they do.
       return;
     }
     if (tag === 'p') {
       const text = (node.text || '').trim();
       if (!text) return;
-      // Bare-number paragraph (e.g., "1", "133", "II.") — Constitute uses
-      // these as section markers in many British-tradition constitutions
-      // (Nigeria, Pakistan, Kenya, Australia) instead of an h3 heading.
       if (/^(\d{1,4}|[IVXLCDM]{1,8})\.?$/.test(text) && text.length <= 8) {
         flush();
         pendingHeading = `Section ${text.replace(/\.$/, '')}`;
         return;
       }
-      // Otherwise it's body text. We used to require class="content", but
-      // some constitutions emit body paragraphs without that class.
       pendingParas.push(text);
       return;
     }
     if ((tag === 'ol' || tag === 'ul') && pendingHeading) {
-      // Numbered lists inside an article typically enumerate distinct rights
-      // (e.g. Mongolia's Article 16 lists 18 separate freedoms). Splitting
-      // each <li> into its own article row gives the TF-IDF retriever a
-      // tight, focused passage to match "freedom of speech in Mongolia"
-      // against, instead of one 360-word lump where every keyword is diluted.
       const parentHeading = pendingHeading;
-      flush(); // commit whatever intro text preceded the list
+      flush();
       const liChildren = (node.childNodes || []).filter(
         (ch) => ch.tagName?.toLowerCase() === 'li',
       );
@@ -415,8 +340,6 @@ function parseConstitute(html) {
       return;
     }
     if (tag === 'li') {
-      // Stand-alone <li> outside a numbered list — append text to current
-      // article rather than splitting.
       const text = (node.text || '').trim();
       if (text) pendingParas.push(text);
       return;
@@ -430,8 +353,6 @@ function parseConstitute(html) {
   flush();
   return articles;
 }
-
-// ---------- Wikipedia (fallback) ----------
 
 async function fetchWikipediaSummary(countryName) {
   const variants = [
@@ -455,13 +376,10 @@ async function fetchWikipediaSummary(countryName) {
         };
       }
     } catch {
-      /* try next variant */
     }
   }
   return null;
 }
-
-// ---------- Supabase write helpers ----------
 
 async function upsertConstitution(row) {
   const { error } = await supabaseWithRetry(() =>
@@ -471,7 +389,6 @@ async function upsertConstitution(row) {
 }
 
 async function replaceArticles(constitutionId, rows) {
-  // Upsert all new rows in chunks…
   for (let i = 0; i < rows.length; i += 50) {
     const chunk = rows.slice(i, i + 50);
     const { error } = await supabaseWithRetry(() =>
@@ -479,7 +396,6 @@ async function replaceArticles(constitutionId, rows) {
     );
     if (error) return error;
   }
-  // …then drop any leftover rows from a previous, larger revision.
   const { error: dErr } = await supabaseWithRetry(() =>
     sb
       .from('articles')
@@ -489,8 +405,6 @@ async function replaceArticles(constitutionId, rows) {
   );
   return dErr || null;
 }
-
-// ---------- Main ----------
 
 async function main() {
   console.log('\nLoading Constitute Project index…');
@@ -509,15 +423,8 @@ async function main() {
   let withProfileOnly = 0;
   let articlesWritten = 0;
   let failed = 0;
-  // Countries whose Constitute fetch failed transiently OR whose Supabase
-  // write returned an error. We retry these once more after the main pass
-  // — gives flaky networks time to recover.
   const needsRetry = [];
 
-  // Returns { status: 'constitute' | 'wiki' | 'profile' | 'failed',
-  //           hadNetworkError: boolean,
-  //           constituteAvailable: boolean,
-  //           articlesAdded: number }
   async function processCountry(c, displayPrefix) {
     const id = c.cca2.toLowerCase();
     const country = c.name.common;
@@ -600,7 +507,6 @@ async function main() {
       return { status: 'failed', hadNetworkError: isNetwork, constituteAvailable: !!cMatch, articlesAdded: 0 };
     }
 
-    // Write articles
     if (parsedArticles) {
       const rows = parsedArticles.map((a) => ({
         id: `${id}-cp-${String(a.ord).padStart(3, '0')}`,
@@ -641,8 +547,6 @@ async function main() {
       return { status: 'wiki', hadNetworkError, constituteAvailable: !!cMatch, articlesAdded: 1 };
     }
 
-    // Synthetic country profile so the AI corpus has at least one row for
-    // every country in the world.
     const factsLine =
       [
         capital && `Capital: ${capital}`,
@@ -676,7 +580,6 @@ async function main() {
     return { status: 'profile', hadNetworkError, constituteAvailable: !!cMatch, articlesAdded: 1 };
   }
 
-  // Per-country first-pass status, so retry adjustments are exact.
   const firstStatus = new Map();
   const firstArticles = new Map();
 
@@ -695,7 +598,6 @@ async function main() {
     }
   }
 
-  // -------- First pass --------
   for (const c of countries) {
     total++;
     const prefix = `[${String(total).padStart(3)}/${countries.length}]`;
@@ -703,8 +605,6 @@ async function main() {
     applyDelta(r.status, r.articlesAdded, +1);
     firstStatus.set(c.cca2, r.status);
     firstArticles.set(c.cca2, r.articlesAdded);
-    // Queue for retry: hard failures, OR Constitute matches that downgraded
-    // to wiki/profile because of a network error during the HTML fetch.
     if (
       r.status === 'failed' ||
       (r.constituteAvailable && r.hadNetworkError && r.status !== 'constitute')
@@ -713,18 +613,15 @@ async function main() {
     }
   }
 
-  // -------- Second pass: retry transient failures --------
   if (needsRetry.length > 0) {
     console.log(
       `\n${'─'.repeat(64)}\nRetrying ${needsRetry.length} countries that hit transient errors…\n${'─'.repeat(64)}`,
     );
-    await sleep(5000); // let the network breathe
+    await sleep(5000);
     for (let i = 0; i < needsRetry.length; i++) {
       const c = needsRetry[i];
       const prefix = `[retry ${String(i + 1).padStart(2)}/${needsRetry.length}]`;
       const r = await processCountry(c, prefix);
-      // Roll back the first-pass counts for this country, then apply the
-      // retry's outcome. Net effect: counters reflect the BEST result.
       const oldStatus = firstStatus.get(c.cca2);
       const oldArticles = firstArticles.get(c.cca2) || 0;
       applyDelta(oldStatus, oldArticles, -1);

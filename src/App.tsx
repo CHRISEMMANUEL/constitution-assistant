@@ -29,9 +29,6 @@ const PageLoader = () => (
 )
 
 function App() {
-  // Pull every constitution + article from Supabase into the AI's TF-IDF
-  // index so the assistant can answer about any country, not just the
-  // 29 bundled ones. Failures fall back to the bundled corpus silently.
   useEffect(() => {
     preloadCorpus();
   }, []);

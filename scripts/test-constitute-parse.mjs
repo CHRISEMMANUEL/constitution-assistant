@@ -19,7 +19,6 @@ const json = await res.json();
 const html = json.html;
 console.log(`Fetched HTML for ${consId}: ${html.length} chars\n`);
 
-// Same parser as seed-supabase.mjs
 const root = parseHtml(html);
 const articles = [];
 let currentChapter = '';

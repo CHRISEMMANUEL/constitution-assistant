@@ -1,7 +1,3 @@
--- =========================================================================
--- 1) TABLES
--- =========================================================================
-
 create table if not exists public.constitutions (
   id            text primary key,
   country       text not null,
@@ -16,7 +12,6 @@ create table if not exists public.constitutions (
   created_at    timestamptz not null default now()
 );
 
--- Country metadata. Idempotent — safe to re-run on existing projects.
 alter table public.constitutions
   add column if not exists capital         text,
   add column if not exists population      bigint,
@@ -41,7 +36,6 @@ create index if not exists articles_constitution_idx
 create index if not exists articles_constitution_ord_idx
   on public.articles (constitution_id, ord);
 
--- Optional: per-user bookmarks. Linked to auth.users via FK.
 create table if not exists public.bookmarks (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users(id) on delete cascade,
@@ -51,15 +45,10 @@ create table if not exists public.bookmarks (
   unique (user_id, article_id)
 );
 
--- =========================================================================
--- 2) ROW LEVEL SECURITY
--- =========================================================================
-
 alter table public.constitutions enable row level security;
 alter table public.articles      enable row level security;
 alter table public.bookmarks     enable row level security;
 
--- Constitutions + articles are public read-only content.
 drop policy if exists "constitutions are readable by anyone" on public.constitutions;
 create policy "constitutions are readable by anyone"
   on public.constitutions for select
@@ -70,7 +59,6 @@ create policy "articles are readable by anyone"
   on public.articles for select
   using (true);
 
--- Bookmarks: each user sees and edits only their own.
 drop policy if exists "users can read their own bookmarks" on public.bookmarks;
 create policy "users can read their own bookmarks"
   on public.bookmarks for select

@@ -24,7 +24,7 @@ type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  plain?: string; // text suitable for TTS (no markdown, no source-list lines)
+  plain?: string;
   citations?: CitedAnswer['hits'];
   confidence?: CitedAnswer['confidence'];
   degraded?: CitedAnswer['degraded'];
@@ -50,10 +50,6 @@ const degradedNotice: Record<NonNullable<Message['degraded']>, string> = {
     'No constitutional text is yet indexed for this country — only a basic country profile. The Wikipedia link in the source has fuller information.',
 };
 
-// Splits the spoken text into whitespace-delimited word spans so we can
-// karaoke-highlight whichever one the TTS engine is currently pronouncing.
-// Light/dark aware via brand tokens; spans flow inline so they wrap
-// naturally on small screens without breaking the bubble layout.
 const renderReadingText = (text: string, activeIdx: number) => {
   const tokens = text.split(/(\s+)/);
   let wordIndex = -1;
@@ -128,8 +124,6 @@ const renderInline = (line: string) => {
   });
 };
 
-// Expand legal abbreviations and Roman numerals so TTS reads the text like
-// a lawyer would, not letter-by-letter ("Art. IV" → "Article four").
 const ROMAN_NUMERALS: Record<string, string> = {
   I: 'one', II: 'two', III: 'three', IV: 'four', V: 'five',
   VI: 'six', VII: 'seven', VIII: 'eight', IX: 'nine', X: 'ten',
@@ -143,13 +137,11 @@ const ROMAN_NUMERALS: Record<string, string> = {
 
 const preprocessLegalText = (raw: string): string => {
   let t = raw;
-  // Roman numerals after legal-heading words.
   t = t.replace(
     /\b(Article|Articles|Chapter|Chapters|Section|Sections|Amendment|Amendments|Part|Title|Book|Clause)\s+([IVX]{1,6})\b/g,
     (m, prefix, roman) =>
       ROMAN_NUMERALS[roman] ? `${prefix} ${ROMAN_NUMERALS[roman]}` : m,
   );
-  // Abbreviations.
   t = t
     .replace(/\bArt\.\s?/g, 'Article ')
     .replace(/\bArts\.\s?/g, 'Articles ')
@@ -164,13 +156,10 @@ const preprocessLegalText = (raw: string): string => {
     .replace(/\be\.g\./gi, 'for example')
     .replace(/\bcf\./gi, 'compare')
     .replace(/\bvs?\./gi, 'versus');
-  // "Article 16.16" reads better as "Article sixteen, paragraph sixteen".
   t = t.replace(/\b(Article|Section)\s+(\d+)\.(\d+)\b/g, '$1 $2, paragraph $3');
   return t;
 };
 
-// Strip markdown-ish formatting + the metadata footer, then pass through
-// the legal-text preprocessor.
 const cleanForSpeech = (text: string) =>
   preprocessLegalText(
     text
@@ -198,8 +187,6 @@ export const Assistant: React.FC = () => {
   const [streaming, setStreaming] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
-  // Index of the word the TTS is currently pronouncing in the active message.
-  // -1 when not speaking. Used to drive the karaoke-style highlight.
   const [readingWordIndex, setReadingWordIndex] = useState(-1);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -208,14 +195,12 @@ export const Assistant: React.FC = () => {
     onTranscript: (transcript, isFinal) => {
       setInput(transcript);
       if (isFinal) {
-        // Auto-send a final spoken transcript
         ask(transcript);
       }
     },
     onWordBoundary: setReadingWordIndex,
   });
 
-  // Track when speech ends to clear the speaking-id badge
   useEffect(() => {
     if (!voice.speaking) setActiveSpeakingId(null);
   }, [voice.speaking]);
@@ -227,7 +212,6 @@ export const Assistant: React.FC = () => {
     });
   }, [messages, loading]);
 
-  // If we landed here with ?q=…, ask it once.
   const askedFromUrl = useRef(false);
   useEffect(() => {
     if (askedFromUrl.current) return;
@@ -347,7 +331,6 @@ export const Assistant: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 min-h-0">
-      {/* Header */}
       <div className="on-map mb-3 md:mb-5 flex items-start sm:items-end justify-between gap-2 sm:gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
@@ -382,7 +365,6 @@ export const Assistant: React.FC = () => {
         )}
       </div>
 
-      {/* Suggestion chips */}
       {messages.length <= 1 && (
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4">
           {SUGGESTIONS.map((s) => (
@@ -494,7 +476,6 @@ export const Assistant: React.FC = () => {
             </div>
           ))}
 
-          {/* Show retrieval indicator only before any tokens arrive in the latest msg */}
           {loading &&
             !messages[messages.length - 1]?.content &&
             messages[messages.length - 1]?.role === 'assistant' && (
@@ -512,7 +493,6 @@ export const Assistant: React.FC = () => {
             )}
         </div>
 
-        {/* Input row */}
         <div className="p-2.5 sm:p-3 md:p-4 bg-slate/5 dark:bg-ink-900/40 border-t border-slate/15 dark:border-ink-700">
           <div className="flex items-center gap-2">
             {voice.supportsRecognition && (

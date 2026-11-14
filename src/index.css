@@ -1,42 +1,25 @@
 @import "tailwindcss";
 
-/* Make the `dark:` variant follow our manual `.dark` class toggle, not the
-   OS media query. Required in Tailwind v4 for class-based dark mode. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ──────────────────────────────────────────────────────────────────────────
-   ConstIntell — Editorial palette
-   Inspired by modern premium apps (Linear, Arc, Stripe): one confident
-   brand colour (Iris indigo), a warm editorial secondary (Honey amber),
-   calm sage for AI/success, and harmonized continent accents that blend
-   into the whole instead of fighting it.
-   ────────────────────────────────────────────────────────────────────── */
-
 @theme {
-  /* === Base inks & paper === */
-  --color-ink-950: #07080F;     /* deepest dark — page bg in dark mode */
-  --color-ink-900: #0E1322;     /* primary dark surface */
-  --color-ink-800: #1A2138;     /* elevated dark surface (cards) */
-  --color-ink-700: #283050;     /* dark mode borders */
-  --color-ink-100: #131A2C;     /* near-black on light */
-  --color-paper:   #F7F4ED;     /* warm bone — page bg in light mode */
-  --color-paper-soft: #FFFFFF;  /* light surface */
-  --color-mist:    #C8CCD6;     /* dark-mode secondary text (lifted for contrast) */
-  --color-slate:   #5F6679;     /* light-mode secondary text */
+  --color-ink-950: #07080F;
+  --color-ink-900: #0E1322;
+  --color-ink-800: #1A2138;
+  --color-ink-700: #283050;
+  --color-ink-100: #131A2C;
+  --color-paper:   #F7F4ED;
+  --color-paper-soft: #FFFFFF;
+  --color-mist:    #C8CCD6;
+  --color-slate:   #5F6679;
 
-  /* === Brand: Forest green — single source of truth ===
-     Change --color-brand-500 and every accent in the app updates:
-     buttons, links, hovers, focus rings, text selection, active TOC items,
-     and the legacy iris and world-ocean tokens (aliased below). === */
   --color-brand-50:  #E9F4EB;
   --color-brand-100: #D4EBD7;
   --color-brand-300: #7FBE89;
-  --color-brand-500: #24772D;   /* primary */
-  --color-brand-600: #1D5F24;   /* hover */
-  --color-brand-700: #15461B;   /* active / pressed */
+  --color-brand-500: #24772D;
+  --color-brand-600: #1D5F24;
+  --color-brand-700: #15461B;
 
-  /* === Iris aliases — kept so existing `iris-*` utility classes across the
-     codebase keep compiling, but they now resolve to the green brand. === */
   --color-iris-50:  var(--color-brand-50);
   --color-iris-100: var(--color-brand-100);
   --color-iris-300: var(--color-brand-300);
@@ -44,30 +27,24 @@
   --color-iris-600: var(--color-brand-600);
   --color-iris-700: var(--color-brand-700);
 
-  /* === Editorial: Honey (premium accent) === */
   --color-honey-100: #F8EDD3;
   --color-honey-500: #D89A3A;
   --color-honey-700: #A0701F;
 
-  /* === Sage (AI / success / "listen") === */
   --color-sage-100: #D4F1E5;
   --color-sage-500: #0F9A6E;
   --color-sage-700: #097253;
 
-  /* === Rose (errors / destructive) === */
   --color-rose-500: #C24F6E;
 
-  /* === Continental accents (muted/harmonized — not rainbow) === */
-  --color-region-africa:   #C46E3F;   /* warm clay */
-  --color-region-asia:     #4F8C5C;   /* sage green */
-  --color-region-europe:   #8C5B96;   /* dusty plum */
-  --color-region-americas: #B85D6E;   /* muted rose */
-  --color-region-oceania:  #5C9CA1;   /* dusty teal */
-  --color-region-arctic:   #7BA8C9;   /* powder blue */
-  --color-region-mideast:  #B58A4D;   /* soft saffron */
+  --color-region-africa:   #C46E3F;
+  --color-region-asia:     #4F8C5C;
+  --color-region-europe:   #8C5B96;
+  --color-region-americas: #B85D6E;
+  --color-region-oceania:  #5C9CA1;
+  --color-region-arctic:   #7BA8C9;
+  --color-region-mideast:  #B58A4D;
 
-  /* === Legacy token aliases — keep existing component class names working
-     by remapping them to the new palette. === */
   --color-world-ocean:        var(--color-iris-500);
   --color-world-deep-ocean:   var(--color-ink-100);
   --color-world-navy:         var(--color-ink-950);
@@ -81,18 +58,13 @@
   --color-brand-sapphire:     var(--color-iris-500);
   --color-brand-ivory:        var(--color-paper);
 
-  /* === Typography === */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-serif: 'Merriweather', 'Source Serif Pro', Georgia, serif;
 
-  /* === Radii === */
   --radius-btn: 12px;
   --radius-card: 18px;
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
-   Base — light mode by default; .dark on <html> flips it
-   ────────────────────────────────────────────────────────────────────── */
 @layer base {
   html {
     color-scheme: light;
@@ -110,7 +82,6 @@
     @apply bg-ink-950 text-mist;
   }
 
-  /* Headings */
   h1, h2, h3, h4, h5, h6 {
     @apply text-ink-100 tracking-tight;
   }
@@ -123,9 +94,6 @@
   h3 { @apply text-xl md:text-2xl font-semibold; }
   p  { @apply text-[16px] leading-relaxed; }
 
-  /* Headings + paragraphs that sit directly over the world-map watermark
-     (i.e. NOT inside a Card) get a subtle text-shadow so they always read
-     crisply. Apply via the .on-map class on the wrapper section. */
   .on-map h1, .on-map h2, .on-map h3 {
     text-shadow: 0 1px 2px rgba(247, 244, 237, 0.6);
   }
@@ -139,13 +107,11 @@
     text-shadow: 0 1px 8px rgba(7, 8, 15, 0.7);
   }
 
-  /* Selection */
   ::selection {
     background-color: var(--color-iris-500);
     color: white;
   }
 
-  /* Scrollbar — subtle */
   *::-webkit-scrollbar { width: 10px; height: 10px; }
   *::-webkit-scrollbar-track { background: transparent; }
   *::-webkit-scrollbar-thumb {
@@ -157,9 +123,6 @@
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
-   Components
-   ────────────────────────────────────────────────────────────────────── */
 @layer components {
   .btn-primary {
     @apply bg-brand-500 text-white px-6 py-3 rounded-[12px] font-medium transition-all duration-200
@@ -173,7 +136,6 @@
            hover:border-brand-500 hover:text-brand-500 hover:shadow-[0_0_0_4px_rgba(36,119,45,0.12)];
   }
 
-  /* Glass card — adapts to light/dark */
   .card-glass {
     @apply bg-paper-soft/90 dark:bg-ink-800/70 backdrop-blur-md
            border border-slate/15 dark:border-ink-700
@@ -183,7 +145,6 @@
            transition-colors duration-300;
   }
 
-  /* Brand wordmark gradient */
   .gradient-primary {
     @apply bg-gradient-to-r from-iris-500 to-honey-500 text-transparent bg-clip-text;
   }
@@ -192,15 +153,11 @@
     @apply bg-gradient-to-r from-honey-500 to-[#F0CB87] text-transparent bg-clip-text;
   }
 
-  /* "World" gradient — brand green → honey → sage (no blue/purple) */
   .gradient-world {
     @apply bg-[linear-gradient(90deg,#24772D_0%,#7FBE89_30%,#D89A3A_65%,#0F9A6E_100%)]
            text-transparent bg-clip-text;
   }
 
-  /* Page surface — transparent so the fixed world map background can show
-     through. The base colour is provided by <body>. Only the soft radial
-     gradient overlays live here. */
   .bg-gradient-dark {
     background-image:
       radial-gradient(1200px 600px at 80% -10%, rgba(36,119,45,0.06), transparent 60%),
@@ -212,9 +169,6 @@
       radial-gradient(900px 500px at -10% 110%, rgba(216,154,58,0.06), transparent 60%);
   }
 
-  /* Page vignette — soft fade from transparent in the centre to the page
-     colour at the edges, so the world map watermark never competes with
-     content. Sits above the map but below all other content. */
   .page-vignette {
     background: radial-gradient(
       ellipse at center,
@@ -232,10 +186,6 @@
     );
   }
 }
-
-/* =========================================================================
-   Animations
-   ====================================================================== */
 
 @keyframes worldFloat {
   0%, 100% {

@@ -150,7 +150,8 @@ const resources = {
         privacy: "Privacy Policy",
         terms: "Terms of Service",
         copyright: "© {{year}} ConstIntell — Global Constitutional Intelligence.",
-        powered_by: "Powered by"
+        sources_prefix: "Constitution texts courtesy of",
+        sources_license: "used under CC BY-NC 3.0",
       },
       common: {
         loading: "Loading…"
@@ -302,7 +303,8 @@ const resources = {
         privacy: "Política de Privacidad",
         terms: "Términos de Servicio",
         copyright: "© {{year}} ConstIntell — Inteligencia Constitucional Global.",
-        powered_by: "Desarrollado por"
+        sources_prefix: "Textos constitucionales cortesía de",
+        sources_license: "bajo licencia CC BY-NC 3.0",
       },
       common: {
         loading: "Cargando…"
@@ -454,7 +456,8 @@ const resources = {
         privacy: "Politique de Confidentialité",
         terms: "Conditions d'Utilisation",
         copyright: "© {{year}} ConstIntell — Intelligence Constitutionnelle Mondiale.",
-        powered_by: "Propulsé par"
+        sources_prefix: "Textes constitutionnels fournis par",
+        sources_license: "sous licence CC BY-NC 3.0",
       },
       common: {
         loading: "Chargement…"

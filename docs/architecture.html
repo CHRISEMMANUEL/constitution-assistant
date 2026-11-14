@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assistant Architecture</title>
+<style>
+  :root { --navy:#1f2a44; --gold:#b8893b; --bg:#f7f5f0; --box:#ffffff; --muted:#5b6478; --warn:#b3412e; }
+  body { margin:0; background:var(--bg); color:var(--navy); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:1000px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  h2 { font-size:19px; margin:40px 0 8px; border-bottom:2px solid var(--gold); padding-bottom:4px; }
+  p, li { color:var(--muted); }
+  svg { width:100%; height:auto; background:var(--box); border:1px solid #e3ded2; border-radius:8px; }
+  svg text { font-family:system-ui, -apple-system, "Segoe UI", sans-serif; fill:var(--navy); }
+  .t { font-size:14px; font-weight:600; }
+  .s { font-size:12px; fill:var(--muted); }
+  .lbl { font-size:12px; fill:var(--gold); font-weight:600; }
+  .warn { font-size:12px; fill:var(--warn); font-weight:600; }
+  .group { font-size:13px; font-weight:700; fill:var(--gold); letter-spacing:.04em; }
+</style>
+</head>
+<body>
+<main>
+<h1>Constitution Assistant: architecture</h1>
+<p>The current single-call RAG pipeline, and the proposed multi-agent version. Not built yet.</p>
+
+<h2>Current: one model call, retrieval in the browser</h2>
+<svg viewBox="0 0 960 430" role="img" aria-label="Current architecture diagram">
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2a44"/></marker>
+  </defs>
+  <rect x="20" y="30" width="560" height="300" rx="10" fill="#f7f5f0" stroke="#b8893b" stroke-dasharray="6 4"/>
+  <text x="36" y="54" class="group">BROWSER · React SPA on Netlify</text>
+
+  <rect x="50" y="75" width="220" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="62" y="100" class="t">Assistant page</text>
+  <text x="62" y="120" class="s">Assistant.tsx · ask()</text>
+
+  <rect x="50" y="190" width="220" height="80" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="62" y="215" class="t">ai.ts · answerSmart()</text>
+  <text x="62" y="235" class="s">TF-IDF index of ALL articles</text>
+  <text x="62" y="252" class="s">regex compare fast path</text>
+
+  <rect x="330" y="190" width="220" height="80" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="342" y="215" class="t">openrouter.ts · streamRAG()</text>
+  <text x="342" y="235" class="s">system prompt + model choice</text>
+  <text x="342" y="252" class="s">429 → next free model</text>
+
+  <line x1="160" y1="135" x2="160" y2="188" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="168" y="166" class="lbl">question</text>
+  <line x1="270" y1="230" x2="328" y2="230" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="276" y="222" class="lbl">top 6</text>
+  <path d="M440,190 C440,120 340,105 272,105" fill="none" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="290" y="96" class="lbl">streamed tokens</text>
+
+  <text x="50" y="300" class="warn">✕ no chat history sent · ✕ no citation check</text>
+
+  <rect x="620" y="30" width="320" height="300" rx="10" fill="#f7f5f0" stroke="#b8893b" stroke-dasharray="6 4"/>
+  <text x="636" y="54" class="group">SUPABASE</text>
+
+  <rect x="650" y="75" width="260" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="662" y="100" class="t">Postgres</text>
+  <text x="662" y="120" class="s">constitutions · articles · bookmarks</text>
+
+  <rect x="650" y="190" width="260" height="80" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="662" y="215" class="t">Edge fn: openrouter</text>
+  <text x="662" y="235" class="s">blind passthrough of request body</text>
+  <text x="662" y="252" class="warn">✕ anyone can spend the key</text>
+
+  <path d="M650,110 C470,110 330,150 272,200" fill="none" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="440" y="104" class="lbl">load 25k+ articles</text>
+  <line x1="550" y1="230" x2="648" y2="230" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="586" y="222" class="lbl">body</text>
+
+  <rect x="650" y="355" width="260" height="55" rx="8" fill="#1f2a44"/>
+  <text x="662" y="378" class="t" style="fill:#fff">OpenRouter</text>
+  <text x="662" y="397" class="s" style="fill:#d8c39a">free models (Gemma, Nemotron, Llama)</text>
+  <line x1="780" y1="270" x2="780" y2="353" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="788" y="318" class="lbl">1 call per question</text>
+</svg>
+
+<h2>Proposed: server-side multi-agent pipeline</h2>
+<svg viewBox="0 0 960 640" role="img" aria-label="Proposed multi-agent architecture diagram">
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2a44"/></marker>
+    <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8893b"/></marker>
+  </defs>
+
+  <rect x="20" y="30" width="250" height="580" rx="10" fill="#f7f5f0" stroke="#b8893b" stroke-dasharray="6 4"/>
+  <text x="36" y="54" class="group">BROWSER</text>
+
+  <rect x="40" y="75" width="210" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="52" y="100" class="t">Assistant page</text>
+  <text x="52" y="120" class="s">sends question + history</text>
+
+  <rect x="40" y="250" width="210" height="80" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="52" y="275" class="t">Agent step timeline</text>
+  <text x="52" y="295" class="s">Planning → Searching →</text>
+  <text x="52" y="312" class="s">Writing → Verified</text>
+
+  <rect x="40" y="480" width="210" height="80" rx="8" fill="#fff" stroke="#1f2a44" stroke-dasharray="4 3"/>
+  <text x="52" y="505" class="t">Local TF-IDF fallback</text>
+  <text x="52" y="525" class="s">offline / function down</text>
+  <text x="52" y="542" class="s">(today's ai.ts, kept)</text>
+
+  <rect x="310" y="30" width="410" height="580" rx="10" fill="#f7f5f0" stroke="#b8893b" stroke-dasharray="6 4"/>
+  <text x="326" y="54" class="group">SUPABASE EDGE FN · assistant (orchestrator)</text>
+
+  <rect x="365" y="75" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="377" y="100" class="t">1 · Planner</text>
+  <text x="377" y="120" class="s">intent · countries · standalone query</text>
+
+  <rect x="377" y="183" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <rect x="371" y="179" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <rect x="365" y="175" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="377" y="200" class="t">2 · Researcher × N (parallel)</text>
+  <text x="377" y="220" class="s">one per country · no model call</text>
+
+  <rect x="377" y="283" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44" stroke-dasharray="4 3"/>
+  <rect x="371" y="279" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44" stroke-dasharray="4 3"/>
+  <rect x="365" y="275" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44" stroke-dasharray="4 3"/>
+  <text x="377" y="300" class="t">3 · Analyst × N (compare only)</text>
+  <text x="377" y="320" class="s">per-country summary, parallel</text>
+
+  <rect x="365" y="375" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="377" y="400" class="t">4 · Writer</text>
+  <text x="377" y="420" class="s">streams cited answer [Source N]</text>
+
+  <rect x="365" y="475" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="377" y="500" class="t">5 · Verifier</text>
+  <text x="377" y="520" class="s">code check quotes + sources; 1 repair</text>
+
+  <rect x="365" y="560" width="300" height="38" rx="8" fill="#fff" stroke="#b8893b" stroke-dasharray="4 3"/>
+  <text x="377" y="584" class="s">optional · Tutor (plain language + quiz)</text>
+
+  <line x1="515" y1="135" x2="515" y2="173" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
+  <line x1="515" y1="235" x2="515" y2="273" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
+  <line x1="515" y1="335" x2="515" y2="373" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
+  <line x1="515" y1="435" x2="515" y2="473" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
+
+  <line x1="250" y1="105" x2="363" y2="105" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
+  <text x="275" y="97" class="lbl">POST</text>
+  <path d="M365,505 L290,505 L290,290 L252,290" fill="none" stroke="#b8893b" stroke-width="1.8" marker-end="url(#a3)"/>
+  <text x="198" y="385" class="lbl" transform="rotate(-90 308 385)">SSE: plan · sources · token · verify</text>
+
+  <text x="760" y="54" class="group">DATA &amp; MODELS</text>
+  <rect x="750" y="175" width="190" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
+  <text x="762" y="200" class="t">Postgres</text>
+  <text x="762" y="220" class="s">search_articles() RPC</text>
+  <line x1="665" y1="205" x2="748" y2="205" stroke="#1f2a44" stroke-width="1.5" marker-start="url(#a2)" marker-end="url(#a2)"/>
+
+  <rect x="750" y="320" width="190" height="130" rx="8" fill="#1f2a44"/>
+  <text x="762" y="346" class="t" style="fill:#fff">OpenRouter models</text>
+  <text x="762" y="368" class="s" style="fill:#d8c39a">key stays server-side</text>
+  <text x="762" y="388" class="s" style="fill:#d8c39a">prompts fixed on server</text>
+  <text x="762" y="408" class="s" style="fill:#d8c39a">~1 call simple question</text>
+  <text x="762" y="428" class="s" style="fill:#d8c39a">~5 calls 3-country compare</text>
+
+  <path d="M665,105 C720,105 730,330 748,340" fill="none" stroke="#b8893b" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <line x1="665" y1="305" x2="748" y2="360" stroke="#b8893b" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <line x1="665" y1="405" x2="748" y2="400" stroke="#b8893b" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <path d="M665,505 C720,505 730,450 748,440" fill="none" stroke="#b8893b" stroke-width="1.2" stroke-dasharray="5 4"/>
+</svg>
+
+<h2>Phases</h2>
+<ol>
+  <li>Search RPC migration + <code>assistant</code> function with Planner, Researchers, Writer (with chat history); client switches over; retire the passthrough proxy.</li>
+  <li>Per-country Analysts for comparisons + Verifier.</li>
+  <li>Tutor/quiz agent + agent step timeline in the UI.</li>
+</ol>
+</main>
+</body>
+</html>

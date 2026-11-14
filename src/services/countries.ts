@@ -1,11 +1,3 @@
-// REST Countries integration — pulls the full country catalogue (~250)
-// and normalizes it to our Constitution shape so the Explorer can list
-// every country, not just the ones with bundled text.
-//
-// Cached in localStorage for 7 days. Free, no API key.
-//
-// Docs: https://restcountries.com/
-
 import type { Region } from '../data/constitutions';
 
 interface RestCountry {
@@ -52,7 +44,6 @@ const FIELDS = [
   'languages',
 ].join(',');
 
-// Try the primary endpoint first, then a couple of mirrors if it fails.
 const ENDPOINTS = [
   `https://restcountries.com/v3.1/all?fields=${FIELDS}`,
   `https://restcountries.com/v3.1/independent?status=true&fields=${FIELDS}`,
@@ -107,7 +98,6 @@ const readCache = (): CountryProfile[] | null => {
       return data;
     }
   } catch {
-    /* ignore corrupted cache */
   }
   return null;
 };
@@ -116,13 +106,8 @@ const writeCache = (data: CountryProfile[]) => {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
   } catch {
-    /* quota exceeded — non-fatal */
   }
 };
-
-// =========================================================================
-// Status — exposed so the UI can show whether the catalogue loaded.
-// =========================================================================
 
 export type CountriesStatus =
   | { state: 'idle' }
@@ -143,8 +128,6 @@ const setStatus = (s: CountriesStatus) => {
   currentStatus = s;
   listeners.forEach((l) => l(s));
 };
-
-// =========================================================================
 
 const fetchWithTimeout = async (url: string, ms: number): Promise<Response> => {
   const ctrl = new AbortController();

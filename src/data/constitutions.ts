@@ -1,7 +1,3 @@
-// Bundled constitutional content used as offline fallback and as the corpus
-// for the local retrieval-based AI assistant. Excerpts only — sourced from
-// public-domain official texts. Article numbering preserved where possible.
-
 export type Region =
   | 'africa'
   | 'asia'
@@ -121,7 +117,6 @@ export const constitutions: BundledConstitution[] = [
       'Federates the Australian colonies into the Commonwealth and establishes a Westminster parliamentary system within a federal structure.',
   },
 
-  // ============ EUROPE ============
   {
     id: 'uk',
     country: 'United Kingdom',
@@ -178,7 +173,6 @@ export const constitutions: BundledConstitution[] = [
       'Adopted after the dissolution of the USSR, it establishes a semi-presidential federal republic; substantially amended in 2020.',
   },
 
-  // ============ AMERICAS ============
   {
     id: 'ca',
     country: 'Canada',
@@ -224,7 +218,6 @@ export const constitutions: BundledConstitution[] = [
       'Originally adopted under the Pinochet regime and substantially reformed in 1989 and 2005, it establishes a presidential republic.',
   },
 
-  // ============ ASIA ============
   {
     id: 'cn',
     country: 'China',
@@ -281,7 +274,6 @@ export const constitutions: BundledConstitution[] = [
       'Adopted after the People Power Revolution, this presidential constitution restored democracy and includes a robust bill of rights.',
   },
 
-  // ============ AFRICA ============
   {
     id: 'ke',
     country: 'Kenya',
@@ -316,7 +308,6 @@ export const constitutions: BundledConstitution[] = [
       'Adopted by referendum after the 2013 transition, declaring Egypt a democratic republic with Islam as the state religion and Sharia as the principal source of legislation.',
   },
 
-  // ============ MIDDLE EAST ============
   {
     id: 'sa',
     country: 'Saudi Arabia',
@@ -351,7 +342,6 @@ export const constitutions: BundledConstitution[] = [
       'Israel has no single written constitution. Its constitutional order is built from fourteen Basic Laws, including Human Dignity and Liberty (1992) and The Knesset (1958).',
   },
 
-  // ============ OCEANIA ============
   {
     id: 'nz',
     country: 'New Zealand',
@@ -366,7 +356,6 @@ export const constitutions: BundledConstitution[] = [
 ];
 
 export const articles: BundledArticle[] = [
-  // ============ UNITED STATES ============
   {
     id: 'us-preamble',
     constitution_id: 'us',
@@ -449,7 +438,6 @@ export const articles: BundledArticle[] = [
       'All persons born or naturalized in the United States, and subject to the Constsdiction thereof, are citizens of the United States and of the State wherein they reside. No State shall make or enforce any law which shall abridge the privileges or immunities of citizens of the United States; nor shall any State deprive any person of life, liberty, or property, without due process of law; nor deny to any person within its Constsdiction the equal protection of the laws.',
   },
 
-  // ============ NIGERIA ============
   {
     id: 'ng-preamble',
     constitution_id: 'ng',
@@ -523,7 +511,6 @@ export const articles: BundledArticle[] = [
       '(1) There shall be for the Federation a President. (2) The President shall be the Head of State, the Chief Executive of the Federation and Commander-in-Chief of the Armed Forces of the Federation.',
   },
 
-  // ============ INDIA ============
   {
     id: 'in-preamble',
     constitution_id: 'in',
@@ -570,7 +557,6 @@ export const articles: BundledArticle[] = [
       '(1) The right to move the Supreme Court by appropriate proceedings for the enforcement of the rights conferred by this Part is guaranteed. (2) The Supreme Court shall have power to issue directions or orders or writs, including writs in the nature of habeas corpus, mandamus, prohibition, quo warranto and certiorari...',
   },
 
-  // ============ GERMANY ============
   {
     id: 'de-art1',
     constitution_id: 'de',
@@ -608,7 +594,6 @@ export const articles: BundledArticle[] = [
       '(1) The Federal Republic of Germany is a democratic and social federal state. (2) All state authority is derived from the people. It shall be exercised by the people through elections and other votes and through specific legislative, executive and judicial bodies. (3) The legislature shall be bound by the constitutional order, the executive and the judiciary by law and justice.',
   },
 
-  // ============ SOUTH AFRICA ============
   {
     id: 'za-s1',
     constitution_id: 'za',
@@ -646,7 +631,6 @@ export const articles: BundledArticle[] = [
       '(1) Everyone has the right to freedom of expression, which includes — (a) freedom of the press and other media; (b) freedom to receive or impart information or ideas; (c) freedom of artistic creativity; and (d) academic freedom and freedom of scientific research. (2) The right in subsection (1) does not extend to — (a) propaganda for war; (b) incitement of imminent violence; or (c) advocacy of hatred...',
   },
 
-  // ============ BRAZIL ============
   {
     id: 'br-art1',
     constitution_id: 'br',
@@ -666,7 +650,6 @@ export const articles: BundledArticle[] = [
       'All persons are equal before the law, without any distinction whatsoever, Brazilians and foreigners residing in the country being ensured of inviolability of the right to life, liberty, equality, security and property... IV. the manifestation of thought is free, anonymity being forbidden; IX. the expression of intellectual, artistic, scientific and communications activities is free, independent of any censorship or license...',
   },
 
-  // ============ JAPAN ============
   {
     id: 'jp-art9',
     constitution_id: 'jp',
@@ -695,7 +678,6 @@ export const articles: BundledArticle[] = [
       'Freedom of assembly and association as well as speech, press and all other forms of expression are guaranteed. (2) No censorship shall be maintained, nor shall the secrecy of any means of communication be violated.',
   },
 
-  // ============ AUSTRALIA ============
   {
     id: 'au-s1',
     constitution_id: 'au',
@@ -724,7 +706,6 @@ export const articles: BundledArticle[] = [
       'The Commonwealth shall not make any law for establishing any religion, or for imposing any religious observance, or for prohibiting the free exercise of any religion, and no religious test shall be required as a qualification for any office or public trust under the Commonwealth.',
   },
 
-  // ============ UNITED KINGDOM ============
   {
     id: 'uk-magna-39',
     constitution_id: 'uk',
@@ -753,7 +734,6 @@ export const articles: BundledArticle[] = [
       '(1) It is unlawful for a public authority to act in a way which is incompatible with a Convention right. (3) In this section, "public authority" includes a court or tribunal, and any person certain of whose functions are functions of a public nature.',
   },
 
-  // ============ FRANCE ============
   {
     id: 'fr-drhc-1',
     constitution_id: 'fr',
@@ -782,7 +762,6 @@ export const articles: BundledArticle[] = [
       'France shall be an indivisible, secular, democratic and social Republic. It shall ensure the equality of all citizens before the law, without distinction of origin, race or religion. It shall respect all beliefs. It shall be organised on a decentralised basis.',
   },
 
-  // ============ ITALY ============
   {
     id: 'it-art1',
     constitution_id: 'it',
@@ -811,7 +790,6 @@ export const articles: BundledArticle[] = [
       'Anyone has the right to freely express their thoughts in speech, writing, or any other form of communication. The press may not be subjected to any authorisation or censorship.',
   },
 
-  // ============ SPAIN ============
   {
     id: 'es-s1',
     constitution_id: 'es',
@@ -840,7 +818,6 @@ export const articles: BundledArticle[] = [
       '(1) The following rights are recognised and protected: (a) the right to freely express and disseminate thoughts, ideas and opinions through words, in writing or by any other means of communication; (d) the right to freely communicate or receive truthful information by any means of dissemination. (2) The exercise of these rights may not be restricted by any form of prior censorship.',
   },
 
-  // ============ RUSSIA ============
   {
     id: 'ru-art1',
     constitution_id: 'ru',
@@ -869,7 +846,6 @@ export const articles: BundledArticle[] = [
       '(1) Everyone shall be guaranteed the freedom of thought and speech. (5) The freedom of the mass media shall be guaranteed. Censorship shall be prohibited.',
   },
 
-  // ============ CANADA ============
   {
     id: 'ca-charter-1',
     constitution_id: 'ca',
@@ -907,7 +883,6 @@ export const articles: BundledArticle[] = [
       '(1) Every individual is equal before and under the law and has the right to the equal protection and equal benefit of the law without discrimination and, in particular, without discrimination based on race, national or ethnic origin, colour, religion, sex, age or mental or physical disability.',
   },
 
-  // ============ MEXICO ============
   {
     id: 'mx-art1',
     constitution_id: 'mx',
@@ -936,7 +911,6 @@ export const articles: BundledArticle[] = [
       'Ownership of lands and waters within the boundaries of the national territory is vested originally in the Nation, which has had, and has, the right to transmit title thereof to private persons, thereby constituting private property.',
   },
 
-  // ============ ARGENTINA ============
   {
     id: 'ar-art14',
     constitution_id: 'ar',
@@ -965,7 +939,6 @@ export const articles: BundledArticle[] = [
       'No inhabitant of the Nation may be punished without previous trial based on a law enacted before the act that gives rise to the proceedings, nor tried by special commissions, nor removed from the judges designated by law before the act for which he is tried. No one may be compelled to testify against himself, nor be arrested except by virtue of a written order issued by a competent authority.',
   },
 
-  // ============ CHILE ============
   {
     id: 'cl-art1',
     constitution_id: 'cl',
@@ -994,7 +967,6 @@ export const articles: BundledArticle[] = [
       'The Constitution guarantees the freedom to express opinions and to inform, without prior censorship, in any form and by any medium, without prejudice to liability for the offences and abuses committed in the exercise of these freedoms, in accordance with the law.',
   },
 
-  // ============ CHINA ============
   {
     id: 'cn-art1',
     constitution_id: 'cn',
@@ -1023,7 +995,6 @@ export const articles: BundledArticle[] = [
       'Citizens of the People\'s Republic of China enjoy freedom of speech, of the press, of assembly, of association, of procession and of demonstration.',
   },
 
-  // ============ SOUTH KOREA ============
   {
     id: 'kr-art1',
     constitution_id: 'kr',
@@ -1052,7 +1023,6 @@ export const articles: BundledArticle[] = [
       '(1) All citizens shall enjoy freedom of speech and the press, and freedom of assembly and association. (2) Licensing or censorship of speech and the press, and licensing of assembly and association shall not be permitted.',
   },
 
-  // ============ INDONESIA ============
   {
     id: 'id-pancasila',
     constitution_id: 'id',
@@ -1081,7 +1051,6 @@ export const articles: BundledArticle[] = [
       '(1) Every person shall be free to choose and to practise the religion of his/her choice; to choose his/her education and schooling, his/her occupation, his/her nationality, his/her residence within the territory of the country, and to leave the country and to subsequently return. (3) Every person shall have the right to the freedom to associate, to assemble and to express his/her opinions.',
   },
 
-  // ============ PAKISTAN ============
   {
     id: 'pk-art8',
     constitution_id: 'pk',
@@ -1110,7 +1079,6 @@ export const articles: BundledArticle[] = [
       'Every citizen shall have the right to freedom of speech and expression, and there shall be freedom of the press, subject to any reasonable restrictions imposed by law in the interest of the glory of Islam or the integrity, security or defence of Pakistan or any part thereof, friendly relations with foreign States, public order, decency or morality, or in relation to contempt of court, commission of or incitement to an offence.',
   },
 
-  // ============ PHILIPPINES ============
   {
     id: 'ph-art2-s1',
     constitution_id: 'ph',
@@ -1139,7 +1107,6 @@ export const articles: BundledArticle[] = [
       'No law shall be passed abridging the freedom of speech, of expression, or of the press, or the right of the people peaceably to assemble and petition the government for redress of grievances.',
   },
 
-  // ============ KENYA ============
   {
     id: 'ke-art1',
     constitution_id: 'ke',
@@ -1168,7 +1135,6 @@ export const articles: BundledArticle[] = [
       '(1) Every person has the right to freedom of expression, which includes — (a) freedom to seek, receive or impart information or ideas; (b) freedom of artistic creativity; and (c) academic freedom and freedom of scientific research. (2) The right to freedom of expression does not extend to — (a) propaganda for war; (b) incitement to violence; (c) hate speech; or (d) advocacy of hatred.',
   },
 
-  // ============ GHANA ============
   {
     id: 'gh-art1',
     constitution_id: 'gh',
@@ -1197,7 +1163,6 @@ export const articles: BundledArticle[] = [
       '(1) All persons shall have the right to — (a) freedom of speech and expression, which shall include freedom of the press and other media; (b) freedom of thought, conscience and belief, which shall include academic freedom; (c) freedom to practise any religion and to manifest such practice; (d) freedom of assembly including freedom to take part in processions and demonstrations; (e) freedom of association.',
   },
 
-  // ============ EGYPT ============
   {
     id: 'eg-art1',
     constitution_id: 'eg',
@@ -1226,7 +1191,6 @@ export const articles: BundledArticle[] = [
       'Freedom of thought and opinion is guaranteed. Every person has the right to express their opinion verbally, in writing, through imagery, or by any other means of expression and publication.',
   },
 
-  // ============ SAUDI ARABIA ============
   {
     id: 'sa-art1',
     constitution_id: 'sa',
@@ -1255,7 +1219,6 @@ export const articles: BundledArticle[] = [
       'The State shall protect human rights in accordance with the Islamic Sharia.',
   },
 
-  // ============ TÜRKIYE ============
   {
     id: 'tr-art1',
     constitution_id: 'tr',
@@ -1284,7 +1247,6 @@ export const articles: BundledArticle[] = [
       'Everyone has the right to express and disseminate his/her thoughts and opinions by speech, in writing or in pictures or through other media, individually or collectively. This freedom includes the liberty of receiving or imparting information or ideas without interference by official authorities.',
   },
 
-  // ============ ISRAEL ============
   {
     id: 'il-hdl-2',
     constitution_id: 'il',
@@ -1313,7 +1275,6 @@ export const articles: BundledArticle[] = [
       'The Knesset is the parliament of the State.',
   },
 
-  // ============ NEW ZEALAND ============
   {
     id: 'nz-ca-1986',
     constitution_id: 'nz',

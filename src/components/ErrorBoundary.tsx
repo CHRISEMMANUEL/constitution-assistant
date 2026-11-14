@@ -1,11 +1,6 @@
 import { Component, type ReactNode } from 'react';
 import { reportError } from '../lib/sentry';
 
-// A single JS error inside a component subtree (a bad article row, a stale
-// Supabase shape, a TTS bug on an obscure browser) used to blank the whole
-// page in React 19. This catches it, logs to the console for debugging,
-// and shows a recoverable fallback so the user can navigate away.
-
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
@@ -24,7 +19,6 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
     console.error('[ErrorBoundary]', error, info);
-    // Forward to Sentry. No-op unless VITE_SENTRY_DSN is configured.
     reportError(error, { componentStack: info.componentStack });
   }
 

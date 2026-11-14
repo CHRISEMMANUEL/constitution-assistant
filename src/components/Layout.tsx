@@ -41,7 +41,6 @@ export const Layout: React.FC = () => {
 
   const visibleNavItems = navItems.filter((i) => !i.authOnly || !!user);
 
-  // Lock body scroll while the side drawer is open.
   useEffect(() => {
     if (!menuOpen) return;
     const prev = document.body.style.overflow;
@@ -51,7 +50,6 @@ export const Layout: React.FC = () => {
     };
   }, [menuOpen]);
 
-  // Close drawer when navigating.
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
@@ -74,12 +72,6 @@ export const Layout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col font-sans relative isolate">
-      {/* ===== Background stack (fixed, behind everything) =====
-          Layered, from bottom to top:
-            1. The body's base colour (paper / ink-950)
-            2. The world map watermark, gently floating
-            3. A radial vignette so text near the centre stays crisp
-      */}
       <div
         aria-hidden="true"
         className="fixed inset-0 -z-10 pointer-events-none flex items-center justify-center overflow-hidden"
@@ -95,11 +87,9 @@ export const Layout: React.FC = () => {
         className="fixed inset-0 -z-10 pointer-events-none page-vignette"
       />
 
-      {/* Top Navigation */}
       <header className="sticky top-0 z-50 bg-paper/85 dark:bg-ink-950/80 backdrop-blur-md border-b border-slate/15 dark:border-ink-700 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            {/* Logo */}
             <Link to="/" className="flex items-center gap-3 group">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-region-americas via-world-earth to-region-asia flex items-center justify-center text-white shadow-lg group-hover:shadow-world-ocean/20 transition-all">
                 <Scale className="w-5 h-5" />
@@ -109,7 +99,6 @@ export const Layout: React.FC = () => {
               </span>
             </Link>
 
-            {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-6 lg:gap-8">
               {visibleNavItems.filter((i) => i.path !== '/').map((item) => {
                 const isActive = item.exact
@@ -133,7 +122,6 @@ export const Layout: React.FC = () => {
               })}
             </nav>
 
-            {/* Action Buttons */}
             <div className="hidden md:flex items-center gap-3">
               <select 
                 value={i18n.resolvedLanguage || 'en'} 
@@ -206,7 +194,6 @@ export const Layout: React.FC = () => {
               )}
             </div>
 
-            {/* Mobile Menu Button */}
             <div className="flex md:hidden items-center gap-2">
               <button
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -229,7 +216,6 @@ export const Layout: React.FC = () => {
         </div>
       </header>
 
-      {/* ===== Mobile slide-in side drawer ===== */}
       <AnimatePresence>
         {menuOpen && (
           <motion.div
@@ -239,7 +225,6 @@ export const Layout: React.FC = () => {
             animate={{ pointerEvents: 'auto' }}
             exit={{ pointerEvents: 'none' }}
           >
-            {/* Backdrop */}
             <motion.div
               className="absolute inset-0 bg-ink-950/40 backdrop-blur-sm"
               initial={{ opacity: 0 }}
@@ -249,7 +234,6 @@ export const Layout: React.FC = () => {
               onClick={() => setMenuOpen(false)}
             />
 
-            {/* Drawer panel — slides from the right */}
             <motion.aside
               className="absolute right-0 top-0 h-full w-[85%] max-w-sm
                          bg-paper-soft dark:bg-ink-900
@@ -264,7 +248,6 @@ export const Layout: React.FC = () => {
               aria-modal="true"
               aria-label="Main navigation"
             >
-              {/* Drawer header */}
               <div className="flex items-center justify-between h-20 px-5 border-b border-slate/15 dark:border-ink-700">
                 <Link
                   to="/"
@@ -287,7 +270,6 @@ export const Layout: React.FC = () => {
                 </button>
               </div>
 
-              {/* User card */}
               {user && (
                 <div className="px-5 py-4 border-b border-slate/15 dark:border-ink-700">
                   <div className="flex items-center gap-3">
@@ -306,7 +288,6 @@ export const Layout: React.FC = () => {
                 </div>
               )}
 
-              {/* Nav items */}
               <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
                 {visibleNavItems.map((item) => {
                   const isActive = item.exact
@@ -330,7 +311,6 @@ export const Layout: React.FC = () => {
                 })}
               </nav>
 
-              {/* Auth actions */}
               <div className="border-t border-slate/15 dark:border-ink-700 p-4 space-y-2">
                 {user ? (
                   <button
@@ -367,12 +347,10 @@ export const Layout: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Main Content Area — flex column so child pages can use flex-1 */}
       <main className="flex-1 flex flex-col bg-gradient-dark">
         <Outlet />
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-slate/15 dark:border-ink-700 bg-paper/60 dark:bg-ink-950/70 backdrop-blur-sm py-6 md:py-8 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 text-center text-xs md:text-sm text-slate dark:text-mist space-y-4">
           <div className="flex justify-center gap-1">
@@ -393,14 +371,30 @@ export const Layout: React.FC = () => {
             <strong>Disclaimer:</strong> {t('footer.disclaimer')}
           </p>
 
+          <p className="max-w-2xl mx-auto text-[10px] sm:text-xs opacity-80">
+            {t('footer.sources_prefix')}{' '}
+            <a
+              href="https://www.constituteproject.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-iris-500 transition-colors"
+            >
+              Constitute
+            </a>{' '}
+            (Elkins, Ginsburg &amp; Melton),{' '}
+            <a
+              href="https://creativecommons.org/licenses/by-nc/3.0/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-iris-500 transition-colors"
+            >
+              {t('footer.sources_license')}
+            </a>
+            .
+          </p>
+
           <p>
             {t('footer.copyright', { year: new Date().getFullYear() })}
-          </p>
-          <p className="text-[11px] md:text-xs text-slate/80 dark:text-mist/80">
-            Powered by{' '}
-            <span className="font-semibold tracking-wide gradient-world">
-              Techinstant
-            </span>
           </p>
         </div>
       </footer>

@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-/**
- * Bookmarks (and recently-viewed) are stored in localStorage, keyed per
- * user. Anonymous visitors get a shared 'anon' key. This avoids requiring
- * the Supabase bookmarks table and works fully offline.
- *
- * Simple useState + custom event-bus pattern so changes propagate across
- * components in the same tab. Avoids the useSyncExternalStore "snapshot
- * must be referentially stable" pitfall.
- */
-
 export interface BookmarkRecord {
   article_id: string;
   constitution_id: string;
@@ -26,7 +16,6 @@ const BOOKMARKS_KEY = (uid: string) => `lex-bookmarks:${uid}`;
 const RECENT_KEY = (uid: string) => `lex-recent:${uid}`;
 const RECENT_MAX = 6;
 
-// ---- module-level event bus so updates from one hook ripple to others ----
 type Listener = () => void;
 const listeners = new Set<Listener>();
 const notify = () => listeners.forEach((fn) => fn());
@@ -38,7 +27,6 @@ const subscribe = (fn: Listener) => {
   };
 };
 
-// ---- localStorage helpers ----
 const readJson = <T,>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') return fallback;
   try {
@@ -56,13 +44,8 @@ const writeJson = (key: string, value: unknown) => {
     localStorage.setItem(key, JSON.stringify(value));
     notify();
   } catch {
-    /* quota — non-fatal */
   }
 };
-
-// =========================================================================
-// useBookmarks
-// =========================================================================
 
 export const useBookmarks = () => {
   const { user } = useAuth();
@@ -73,7 +56,6 @@ export const useBookmarks = () => {
   );
 
   useEffect(() => {
-    // When the user changes, reload from the new key.
     setItems(readJson<BookmarkRecord[]>(BOOKMARKS_KEY(uid), []));
 
     const handler = () => {
@@ -125,10 +107,6 @@ export const useBookmarks = () => {
   return { items, isBookmarked, toggle, remove };
 };
 
-// =========================================================================
-// useRecentlyViewed
-// =========================================================================
-
 export const useRecentlyViewed = () => {
   const { user } = useAuth();
   const uid = user?.id ?? 'anon';
@@ -169,7 +147,6 @@ export const useRecentlyViewed = () => {
   return { items, visit };
 };
 
-/** Hook that triggers `visit` once when a constitution id becomes truthy. */
 export const useTrackVisit = (constitutionId: string | null | undefined) => {
   const { visit } = useRecentlyViewed();
   useEffect(() => {

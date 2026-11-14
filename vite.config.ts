@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     tailwindcss(),
@@ -29,12 +28,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Cache the app shell and assets immediately on install.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        // Runtime caching for the read-mostly APIs the app depends on.
         runtimeCaching: [
           {
-            // REST Countries: country metadata, rarely changes.
             urlPattern: /^https:\/\/restcountries\.com\//,
             handler: 'StaleWhileRevalidate',
             options: {
@@ -43,7 +39,6 @@ export default defineConfig({
             },
           },
           {
-            // Supabase reads: serve cached when offline, refresh in background.
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\//,
             handler: 'StaleWhileRevalidate',
             options: {
@@ -52,11 +47,8 @@ export default defineConfig({
             },
           },
         ],
-        // Don't try to serve the API or auth pages offline from index.html.
         navigateFallbackDenylist: [/^\/api\//, /^\/auth\//],
       },
-      // SW disabled in dev so it doesn't interfere with HMR; enable manually
-      // with `npm run dev -- --mode production` if you need to test it.
       devOptions: { enabled: false },
     }),
   ],

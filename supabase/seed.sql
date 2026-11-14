@@ -1,8 +1,4 @@
 
--- =========================================================================
--- CONSTITUTIONS
--- =========================================================================
-
 insert into public.constitutions (id, country, country_code, flag, region, title, adopted, summary) values
   ('us','United States of America','US','🇺🇸','americas','Constitution of the United States','1788',
    'The supreme law of the U.S., establishing the federal government, separation of powers, and protecting fundamental civil liberties through the Bill of Rights.'),
@@ -29,12 +25,7 @@ on conflict (id) do update set
   adopted = excluded.adopted,
   summary = excluded.summary;
 
--- =========================================================================
--- ARTICLES
--- =========================================================================
-
 insert into public.articles (id, constitution_id, chapter, article_number, title, content, ord) values
-  -- United States
   ('us-preamble','us','Preamble','Preamble','Preamble',
    'We the People of the United States, in Order to form a more perfect Union, establish Justice, insure domestic Tranquility, provide for the common defence, promote the general Welfare, and secure the Blessings of Liberty to ourselves and our Posterity, do ordain and establish this Constitution for the United States of America.', 1),
   ('us-art1','us','Article I — Legislative Branch','Article I, §1','Legislative Powers',
@@ -54,7 +45,6 @@ insert into public.articles (id, constitution_id, chapter, article_number, title
   ('us-amend14','us','Reconstruction Amendments','Amendment XIV, §1','Citizenship and Equal Protection',
    'All persons born or naturalized in the United States, and subject to the Constsdiction thereof, are citizens of the United States and of the State wherein they reside. No State shall make or enforce any law which shall abridge the privileges or immunities of citizens of the United States; nor shall any State deprive any person of life, liberty, or property, without due process of law; nor deny to any person within its Constsdiction the equal protection of the laws.', 9),
 
-  -- Nigeria
   ('ng-preamble','ng','Preamble','Preamble','Preamble',
    'WE THE PEOPLE OF THE FEDERAL REPUBLIC OF NIGERIA, having firmly and solemnly resolved: to live in unity and harmony as one indivisible and indissoluble sovereign nation under God... do hereby make, enact and give to ourselves the following Constitution.', 1),
   ('ng-ch1-s1','ng','Chapter I — General Provisions','Section 1','Supremacy of the Constitution',
@@ -72,7 +62,6 @@ insert into public.articles (id, constitution_id, chapter, article_number, title
   ('ng-ch6-s130','ng','Chapter VI — Executive','Section 130','Establishment of the Office of President',
    '(1) There shall be for the Federation a President. (2) The President shall be the Head of State, the Chief Executive of the Federation and Commander-in-Chief of the Armed Forces of the Federation.', 8),
 
-  -- India
   ('in-preamble','in','Preamble','Preamble','Preamble',
    'WE, THE PEOPLE OF INDIA, having solemnly resolved to constitute India into a SOVEREIGN SOCIALIST SECULAR DEMOCRATIC REPUBLIC and to secure to all its citizens: JUSTICE, social, economic and political; LIBERTY of thought, expression, belief, faith and worship; EQUALITY of status and of opportunity... DO HEREBY ADOPT, ENACT AND GIVE TO OURSELVES THIS CONSTITUTION.', 1),
   ('in-art14','in','Part III — Fundamental Rights','Article 14','Equality before Law',
@@ -84,7 +73,6 @@ insert into public.articles (id, constitution_id, chapter, article_number, title
   ('in-art32','in','Part III — Fundamental Rights','Article 32','Right to Constitutional Remedies',
    '(1) The right to move the Supreme Court by appropriate proceedings for the enforcement of the rights conferred by this Part is guaranteed. (2) The Supreme Court shall have power to issue directions or orders or writs, including writs in the nature of habeas corpus, mandamus, prohibition, quo warranto and certiorari...', 5),
 
-  -- Germany
   ('de-art1','de','I. Basic Rights','Article 1','Human Dignity',
    '(1) Human dignity shall be inviolable. To respect and protect it shall be the duty of all state authority. (2) The German people therefore acknowledge inviolable and inalienable human rights as the basis of every community, of peace and of justice in the world. (3) The following basic rights shall bind the legislature, the executive and the judiciary as directly applicable law.', 1),
   ('de-art2','de','I. Basic Rights','Article 2','Personal Freedoms',
@@ -94,7 +82,6 @@ insert into public.articles (id, constitution_id, chapter, article_number, title
   ('de-art20','de','II. The Federation and the Länder','Article 20','Constitutional Principles',
    '(1) The Federal Republic of Germany is a democratic and social federal state. (2) All state authority is derived from the people. It shall be exercised by the people through elections and other votes and through specific legislative, executive and judicial bodies. (3) The legislature shall be bound by the constitutional order, the executive and the judiciary by law and justice.', 4),
 
-  -- South Africa
   ('za-s1','za','Chapter 1 — Founding Provisions','Section 1','Republic of South Africa',
    'The Republic of South Africa is one, sovereign, democratic state founded on the following values: (a) Human dignity, the achievement of equality and the advancement of human rights and freedoms. (b) Non-racialism and non-sexism. (c) Supremacy of the constitution and the rule of law. (d) Universal adult suffrage, a national common voters roll, regular elections and a multi-party system of democratic government, to ensure accountability, responsiveness and openness.', 1),
   ('za-s9','za','Chapter 2 — Bill of Rights','Section 9','Equality',
@@ -104,13 +91,11 @@ insert into public.articles (id, constitution_id, chapter, article_number, title
   ('za-s16','za','Chapter 2 — Bill of Rights','Section 16','Freedom of Expression',
    '(1) Everyone has the right to freedom of expression, which includes — (a) freedom of the press and other media; (b) freedom to receive or impart information or ideas; (c) freedom of artistic creativity; and (d) academic freedom and freedom of scientific research. (2) The right in subsection (1) does not extend to — (a) propaganda for war; (b) incitement of imminent violence; or (c) advocacy of hatred...', 4),
 
-  -- Brazil
   ('br-art1','br','Title I — Fundamental Principles','Article 1','Foundations of the Republic',
    'The Federative Republic of Brazil, formed by the indissoluble union of the states, municipalities and the Federal District, is a democratic State based on the rule of law and is founded on: I. sovereignty; II. citizenship; III. the dignity of the human person; IV. the social values of labor and free enterprise; V. political pluralism.', 1),
   ('br-art5','br','Title II — Fundamental Rights and Guarantees','Article 5','Individual and Collective Rights',
    'All persons are equal before the law, without any distinction whatsoever, Brazilians and foreigners residing in the country being ensured of inviolability of the right to life, liberty, equality, security and property... IV. the manifestation of thought is free, anonymity being forbidden; IX. the expression of intellectual, artistic, scientific and communications activities is free, independent of any censorship or license...', 2),
 
-  -- Japan
   ('jp-art9','jp','Chapter II — Renunciation of War','Article 9','Renunciation of War',
    'Aspiring sincerely to an international peace based on justice and order, the Japanese people forever renounce war as a sovereign right of the nation and the threat or use of force as means of settling international disputes. (2) In order to accomplish the aim of the preceding paragraph, land, sea, and air forces, as well as other war potential, will never be maintained. The right of belligerency of the state will not be recognized.', 1),
   ('jp-art13','jp','Chapter III — Rights and Duties of the People','Article 13','Individual Dignity and Pursuit of Happiness',
@@ -118,7 +103,6 @@ insert into public.articles (id, constitution_id, chapter, article_number, title
   ('jp-art21','jp','Chapter III — Rights and Duties of the People','Article 21','Freedom of Assembly, Association and Speech',
    'Freedom of assembly and association as well as speech, press and all other forms of expression are guaranteed. (2) No censorship shall be maintained, nor shall the secrecy of any means of communication be violated.', 3),
 
-  -- Australia
   ('au-s1','au','Chapter I — The Parliament','Section 1','Legislative Power',
    'The legislative power of the Commonwealth shall be vested in a Federal Parliament, which shall consist of the Queen, a Senate, and a House of Representatives, and which is hereinafter called "The Parliament," or "The Parliament of the Commonwealth."', 1),
   ('au-s51','au','Chapter I — The Parliament','Section 51','Legislative Powers of the Parliament',

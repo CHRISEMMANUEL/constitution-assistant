@@ -1,15 +1,3 @@
-// Constitutional Intelligence engine.
-//
-// The local TF-IDF index is always used as the retriever. When an OpenRouter
-// API key is configured, the retrieved articles are also fed to Llama 3.3
-// as RAG context for a generated, cited answer. Otherwise we return the
-// best-matching quotation directly — no model required.
-//
-// Corpus sources, in priority order:
-//   1. Supabase (every country fetched by the seed script — ~250 covered)
-//   2. Bundled fallback (29 countries shipped in the binary, used while the
-//      Supabase preload is still in flight or if Supabase is unreachable)
-
 import {
   articles as bundledArticles,
   constitutions as bundledConstitutions,
@@ -32,13 +20,6 @@ export interface CitedAnswer {
   reply: string;
   hits: ScoredArticle[];
   confidence: 'high' | 'medium' | 'low';
-  /**
-   * Set when the answer is a graceful degradation rather than the ideal
-   * path — UI surfaces a small badge so the user understands what they're
-   * looking at.
-   *   llm-unavailable: OpenRouter rate-limited / down → local quotation
-   *   profile-only:    only the synthetic country profile matched
-   */
   degraded?: 'llm-unavailable' | 'profile-only';
 }
 
@@ -85,8 +66,6 @@ let preloadPromise: Promise<void> | null = null;
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// Build a fresh country-name boost list from the live constitutions array,
-// so any country mentioned in a question gets ranked higher.
 function buildBoosts(
   cs: Array<BundledConstitution | Constitution>,
 ): Array<{ pattern: RegExp; id: string }> {
@@ -98,7 +77,6 @@ function buildBoosts(
       id: c.id,
     });
   }
-  // Common nicknames that are unambiguous.
   const aliases: Array<[RegExp, string]> = [
     [/\b(united states|usa|u\.s\.|america|american)\b/i, 'us'],
     [/\bbritain|british|uk\b/i, 'gb'],
@@ -146,9 +124,6 @@ function buildIndexFrom(
   return { entries, idf, boosts: buildBoosts(constitutionList), source };
 }
 
-// Async variant — yields to the event loop every CHUNK articles so that
-// building a 16k-article TF-IDF on a low-end Android doesn't freeze the
-// UI thread for 2-3 seconds. Same shape and result as buildIndexFrom.
 async function buildIndexFromAsync(
   articleList: Array<BundledArticle | Article>,
   constitutionList: Array<BundledConstitution | Constitution>,
@@ -175,7 +150,6 @@ async function buildIndexFromAsync(
       });
     }
     if (end < articleList.length) {
-      // Hand the main thread back so the browser can paint a frame.
       await new Promise<void>((r) => setTimeout(r, 0));
     }
   }
@@ -195,16 +169,10 @@ async function buildIndexFromAsync(
 
 function buildIndex(): CorpusIndex {
   if (indexCache) return indexCache;
-  // Synchronous fallback while preloadCorpus() is in flight.
   indexCache = buildIndexFrom(bundledArticles, bundledConstitutions, 'bundled');
   return indexCache;
 }
 
-/**
- * Loads every constitution + article from Supabase (or returns immediately
- * if already loaded). Call once at app start; subsequent calls are no-ops.
- * Failures are non-fatal — the bundled corpus stays in place.
- */
 export async function preloadCorpus(): Promise<void> {
   if (preloadPromise) return preloadPromise;
   preloadPromise = (async () => {
@@ -214,7 +182,6 @@ export async function preloadCorpus(): Promise<void> {
         fetchAllArticles(),
       ]);
       if (allArticles.length === 0 || allCons.length === 0) return;
-      // Chunked build keeps the UI responsive while ~16k articles tokenize.
       indexCache = await buildIndexFromAsync(allArticles, allCons, 'supabase');
       console.info(
         `[ai] corpus loaded: ${allArticles.length} articles across ${allCons.length} countries (Supabase).`,
@@ -228,15 +195,11 @@ export async function preloadCorpus(): Promise<void> {
 
 export const corpusSize = (): number => buildIndex().entries.length;
 
-/** True once the Supabase corpus has been loaded into the index. */
 export const isCorpusReady = (): boolean => indexCache?.source === 'supabase';
 
-/** True if a preload is in flight and we're still on the bundled fallback. */
 export const isCorpusLoading = (): boolean =>
   !!preloadPromise && !isCorpusReady();
 
-// Synthetic profile rows are written by the seed for countries with no
-// constitutional text. Their ids look like "ad-profile", "tv-profile".
 const isProfileOnlyArticle = (a: BundledArticle | Article): boolean =>
   typeof a.id === 'string' && a.id.endsWith('-profile');
 
@@ -392,22 +355,12 @@ export function answer(query: string): CitedAnswer {
   };
 }
 
-// =========================================================================
-// RAG — Retrieval-Augmented Generation via OpenRouter / Llama 3.3
-// =========================================================================
-
-/**
- * Build the RAG context: top-matching articles overall, plus at least one
- * from each country mentioned by name in the query (so comparison questions
- * get cross-country evidence even if one country dominates the ranking).
- */
 function retrieveForRAG(query: string, k = 6): ScoredArticle[] {
   const top = searchCorpus(query, k);
   const { boosts } = buildIndex();
   const mentioned = boosts.filter((c) => c.pattern.test(query)).map((c) => c.id);
   if (mentioned.length < 2) return top;
 
-  // Search a deeper window so we can pull a country-specific best for each.
   const deep = searchCorpus(query, 50);
   const seen = new Set<string>();
   const out: ScoredArticle[] = [];
@@ -435,20 +388,13 @@ const confidenceFromScore = (score: number): CitedAnswer['confidence'] =>
 export interface SmartAnswerOptions {
   query: string;
   signal?: AbortSignal;
-  /** Streamed tokens. For local fallback the full reply is delivered once. */
   onToken?: (token: string) => void;
-  /** Notified when retrieval completes, before generation starts. */
   onSources?: (sources: ScoredArticle[]) => void;
 }
 
 export const ragEnabled = (): boolean => isOpenRouterConfigured();
 export const ragModelLabel = (): string => openRouterModel();
 
-/**
- * Returns a final CitedAnswer. When RAG is enabled and retrieval returns
- * sources, this calls Llama 3.3 with the retrieved articles as context and
- * streams the response. Otherwise it returns the local quotation answer.
- */
 export const answerSmart = async (
   opts: SmartAnswerOptions,
 ): Promise<CitedAnswer> => {
@@ -466,16 +412,11 @@ export const answerSmart = async (
     return empty;
   }
 
-  // Wait for the full Supabase corpus before searching, so the user never
-  // gets a "29 bundled countries only" answer when the real library is
-  // moments away. After the first query this is instant.
   if (preloadPromise && !isCorpusReady()) {
     await preloadPromise.catch(() => {
-      /* preload errors are non-fatal — we'll fall back to bundled */
     });
   }
 
-  // Detect the profile-only case once and reuse for both code paths.
   const tagProfileOnly = (a: CitedAnswer): CitedAnswer => {
     const top = a.hits[0];
     if (top && isProfileOnlyArticle(top.article) && a.hits.length === 1) {
@@ -511,7 +452,6 @@ export const answerSmart = async (
         confidence: confidenceFromScore(sources[0]?.score ?? 0),
       });
     } catch (err) {
-      // If aborted, surface as-is so the caller can show partial output.
       if ((err as Error).name === 'AbortError') {
         return {
           reply: accumulated || '_(generation cancelled)_',
@@ -526,7 +466,6 @@ export const answerSmart = async (
     }
   }
 
-  // No OpenRouter — local quotation engine, simulated as a single token batch.
   const local = answer(trimmed);
   onSources?.(local.hits);
   onToken?.(local.reply);

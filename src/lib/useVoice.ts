@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// Minimal types for the Web Speech API (not in standard TS lib).
 type SpeechRecognitionResult = { transcript: string; isFinal: boolean };
 interface SpeechRecognitionEvent extends Event {
   results: ArrayLike<ArrayLike<SpeechRecognitionResult>> & {
@@ -33,7 +32,6 @@ const getRecognition = (): SpeechRecognitionCtor | null => {
 export interface UseVoiceOptions {
   lang?: string;
   onTranscript?: (transcript: string, isFinal: boolean) => void;
-  /** Fired for each spoken word boundary; index resets to -1 on start/stop. */
   onWordBoundary?: (wordIndex: number) => void;
 }
 
@@ -44,13 +42,8 @@ export const useVoice = ({
 }: UseVoiceOptions = {}) => {
   const RecognitionCtor = getRecognition();
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  // Use a ref so the boundary callback always sees the latest function
-  // without re-running speak() on every render.
   const onWordBoundaryRef = useRef(onWordBoundary);
   onWordBoundaryRef.current = onWordBoundary;
-  // Timer for the boundary-fallback path. iOS Safari and some Android
-  // browsers don't fire SpeechSynthesisUtterance.onboundary, so when no
-  // real boundary arrives within ~1.2s we drive the highlight on a timer.
   const fallbackTimer = useRef<number | null>(null);
   const clearFallback = () => {
     if (fallbackTimer.current != null) {
@@ -66,7 +59,6 @@ export const useVoice = ({
   const supportsSynthesis =
     typeof window !== 'undefined' && 'speechSynthesis' in window;
 
-  // ---------- Recognition (mic) ----------
   const startListening = useCallback(() => {
     if (!RecognitionCtor) {
       setError("Voice input isn't supported in this browser.");
@@ -122,7 +114,6 @@ export const useVoice = ({
     };
   }, []);
 
-  // ---------- Synthesis (TTS) ----------
   const speak = useCallback(
     (text: string, opts?: { rate?: number; pitch?: number }) => {
       if (!supportsSynthesis) {
@@ -137,9 +128,6 @@ export const useVoice = ({
       u.rate = rate;
       u.pitch = opts?.pitch ?? 1;
 
-      // Split for the timer fallback. ~14 chars/sec at rate 1.0 is the
-      // typical English TTS pace; adjust per word so "constitutionally"
-      // gets more time than "the".
       const words = text.trim().split(/\s+/);
       const charsPerSec = 14 * rate;
       let wordIdx = -1;
@@ -149,7 +137,7 @@ export const useVoice = ({
         wordIdx++;
         if (wordIdx >= words.length) return;
         onWordBoundaryRef.current?.(wordIdx);
-        const wordLen = (words[wordIdx]?.length ?? 4) + 1; // +1 for space
+        const wordLen = (words[wordIdx]?.length ?? 4) + 1;
         const delay = Math.max(80, (wordLen / charsPerSec) * 1000);
         fallbackTimer.current = window.setTimeout(advanceFallback, delay);
       }
@@ -157,15 +145,12 @@ export const useVoice = ({
       u.onstart = () => {
         setSpeaking(true);
         onWordBoundaryRef.current?.(-1);
-        // If the engine doesn't emit boundary events within 1.2s, take
-        // over with the timer. Mobile Safari especially.
         fallbackTimer.current = window.setTimeout(() => {
           if (!boundaryFired) advanceFallback();
         }, 1200);
       };
       u.onboundary = (e) => {
         if (e.name && e.name !== 'word') return;
-        // A real boundary fired — abandon any pending timer.
         boundaryFired = true;
         clearFallback();
         wordIdx++;

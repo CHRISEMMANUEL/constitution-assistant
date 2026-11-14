@@ -1,26 +1,12 @@
 import React, { useMemo, useState } from 'react';
 
-/**
- * Renders a real cartographic world map as the page watermark. The default
- * source is a public-domain SVG hosted on Wikimedia Commons. If that fails
- * to load (offline, blocked, etc.), we transparently fall back to a local
- * SVG built from a hand-tuned land-mask grid so the page still has a
- * recognisable map.
- *
- * Override the URL with the `src` prop. Override the rendering mode of the
- * fallback with `variant`.
- */
-
 const REMOTE_WORLD_MAP =
   'https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg';
 
 interface WorldMapProps {
   className?: string;
-  /** External SVG/PNG to use as the primary world map image. */
   src?: string;
-  /** Used only if the remote image fails. */
   variant?: 'dots' | 'silhouette';
-  /** Soft radial gradient toward the edges (silhouette/dots fallback only). */
   fade?: boolean;
 }
 
@@ -42,21 +28,13 @@ export const WorldMap: React.FC<WorldMapProps> = ({
         decoding="async"
         onError={() => setFailed(true)}
         className={`select-none ${className}`}
-        // grayscale removes any tint baked into the map; dark mode inverts so
-        // light-grey continents read against the dark page; opacity is
-        // controlled via the `className` from the consumer (e.g. opacity-10).
         style={{ filter: 'grayscale(1)' }}
       />
     );
   }
 
-  // ----- Local fallback (only used if the remote image fails) -----
   return <FallbackMap className={className} variant={variant} fade={fade} />;
 };
-
-// =========================================================================
-// Local fallback — the previous hand-tuned land mask, used only offline
-// =========================================================================
 
 const LAND_MASK = [
   '                                                                                ',

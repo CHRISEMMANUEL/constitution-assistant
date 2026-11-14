@@ -139,8 +139,6 @@ export const Explorer: React.FC = () => {
   const { constitutionId } = useParams<{ constitutionId?: string }>();
   const navigate = useNavigate();
 
-  // Track this country in the recently-viewed list (powers Home's "Continue
-  // reading" strip). No-op when constitutionId is undefined.
   useTrackVisit(constitutionId);
 
   const { constitutions, constitutionsLoading, getArticles } = useData();
@@ -153,8 +151,6 @@ export const Explorer: React.FC = () => {
   });
   const { t } = useTranslation();
 
-  // Loading is true while the global constitution list is still loading, or
-  // while we're switching country pages and the article list is in flight.
   const loading = constitutionsLoading || articlesLoading;
 
   useEffect(() => {
@@ -164,8 +160,6 @@ export const Explorer: React.FC = () => {
     };
   }, []);
 
-  // When viewing a country, fetch its articles through the cached getter —
-  // second visit to the same country is instant.
   useEffect(() => {
     if (!constitutionId) {
       setArticles([]);
@@ -184,7 +178,6 @@ export const Explorer: React.FC = () => {
     };
   }, [constitutionId, getArticles]);
 
-  // When viewing a country, lock the continent selector to that country's region.
   const activeConstitution = useMemo(
     () => constitutions.find((c) => c.id === constitutionId) ?? null,
     [constitutions, constitutionId],
@@ -201,7 +194,6 @@ export const Explorer: React.FC = () => {
     [continent, constitutions],
   );
 
-  // ============ Country list view ============
   if (!constitutionId) {
     return (
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-8 sm:py-12">
@@ -239,8 +231,6 @@ export const Explorer: React.FC = () => {
             </div>
           </div>
 
-          {/* Only surface the catalogue state when something is wrong;
-              the count above already tells users how much loaded. */}
           {countryStatus.state === 'error' && (
             <p className="text-[11px] text-rose-500">
               ● {t('explorer.error_catalogue')}
@@ -263,7 +253,6 @@ export const Explorer: React.FC = () => {
     );
   }
 
-  // ============ Reading view ============
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
       <button
@@ -308,7 +297,6 @@ export const Explorer: React.FC = () => {
         </div>
       )}
 
-      {/* Non-indexed country: show profile + suggestion */}
       {!loading && activeConstitution && !activeConstitution.indexed && (
         <Card className="p-6 sm:p-8 mb-6">
           <h2 className="m-0 mb-3 text-xl sm:text-2xl">Country profile</h2>
@@ -375,8 +363,6 @@ export const Explorer: React.FC = () => {
           activeConstitution && !activeConstitution.indexed ? 'hidden' : ''
         }`}
       >
-        {/* ToC — collapsed <details> at the top on mobile (so it isn't
-            buried below 200+ articles), sticky sidebar on desktop. */}
         <div className="lg:col-span-1 order-1 lg:order-1">
           <Card className="p-0 lg:p-4 lg:sticky lg:top-28">
             <details className="lg:open:block group" open>
@@ -401,9 +387,6 @@ export const Explorer: React.FC = () => {
                   <p className="text-sm text-slate">No articles available yet.</p>
                 ) : (
                   <ul
-                    // Mobile: tighter cap so the list doesn't push the article
-                    // body too far down when expanded. Desktop: fill remaining
-                    // viewport height below the sticky offset.
                     className="space-y-2 text-sm max-h-[50vh] lg:max-h-[calc(100vh-180px)] overflow-y-auto pr-2"
                   >
                     {articles.map((a) => (

@@ -45,7 +45,6 @@ export const Home: React.FC = () => {
     user?.email?.[0]?.toUpperCase() ||
     'U';
 
-  // When continent changes, clear any country selection that no longer fits.
   useEffect(() => {
     if (!countryId) return;
     const c = constitutions.find((x) => x.id === countryId);
@@ -84,9 +83,7 @@ export const Home: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* ==== HERO ==== */}
       <section className="on-map relative px-4 py-14 sm:py-20 md:py-24 flex flex-col items-center text-center overflow-hidden">
-        {/* Soft warm/cool wash on top of the global world map */}
         <div aria-hidden="true" className="absolute inset-0 -z-10 opacity-60">
           <div className="absolute top-1/4 left-1/4 w-56 h-56 sm:w-72 sm:h-72 rounded-full bg-iris-500/15 blur-3xl" />
           <div className="absolute bottom-1/4 right-1/4 w-56 h-56 sm:w-72 sm:h-72 rounded-full bg-honey-500/15 blur-3xl" />
@@ -124,7 +121,6 @@ export const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* ==== Welcome panel (only when logged in) ==== */}
       {user && (
         <section className="px-3 sm:px-4 -mt-6 sm:-mt-8 mb-6 sm:mb-8">
           <Card className="max-w-4xl mx-auto p-5 sm:p-6 bg-paper-soft/95 dark:bg-ink-800/85">
@@ -177,7 +173,6 @@ export const Home: React.FC = () => {
         </section>
       )}
 
-      {/* ==== Continent + country picker ==== */}
       <section className={`px-3 sm:px-4 ${user ? '' : '-mt-6 sm:-mt-8'}`}>
         <Card className="max-w-4xl mx-auto p-4 sm:p-6 md:p-7 space-y-4 sm:space-y-5 bg-paper-soft/95 dark:bg-ink-800/80 backdrop-blur-md">
           <div className="flex items-center gap-2 text-[11px] sm:text-xs uppercase tracking-[0.18em] text-slate dark:text-mist">
@@ -216,7 +211,6 @@ export const Home: React.FC = () => {
         </Card>
       </section>
 
-      {/* ==== AI Search ==== */}
       <section className="px-3 sm:px-4 mt-6 sm:mt-10">
         <form onSubmit={handleSearch} className="max-w-3xl mx-auto">
           <Card className="p-2 pl-4 sm:pl-5 flex items-center gap-2 sm:gap-3 bg-paper-soft/95 dark:bg-ink-800/80 border-slate/15 dark:border-ink-700">
@@ -235,7 +229,6 @@ export const Home: React.FC = () => {
         </form>
       </section>
 
-      {/* ==== Featured ==== */}
       {featured.length > 0 && (
         <section className="px-3 sm:px-4 py-10 sm:py-14 max-w-7xl mx-auto w-full">
           <div className="flex items-end justify-between mb-5 sm:mb-6">
@@ -273,7 +266,6 @@ export const Home: React.FC = () => {
         </section>
       )}
 
-      {/* ==== Features ==== */}
       <section className="px-3 sm:px-4 pb-16 sm:pb-24 max-w-7xl mx-auto w-full">
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
           <Card className="p-4 sm:p-6 space-y-3 hover:border-iris-500/40 transition-colors">

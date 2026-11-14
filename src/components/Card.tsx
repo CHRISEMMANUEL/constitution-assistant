@@ -9,7 +9,6 @@ export const Card: React.FC<CardProps> = ({ className, children, ...props }) => 
   return (
     <div
       className={cn(
-        // More opaque surface so text reads crisply over the world map watermark.
         'bg-paper-soft/95 dark:bg-ink-800/85 backdrop-blur-xl',
         'border border-slate/15 dark:border-ink-700',
         'rounded-card p-6',

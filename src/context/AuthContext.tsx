@@ -57,7 +57,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       options: { data: fullName ? { full_name: fullName } : undefined },
     });
     if (error) return { error: error.message, needsConfirmation: false };
-    // If session is null, Supabase requires email confirmation before login.
     return { error: null, needsConfirmation: !data.session };
   };
 

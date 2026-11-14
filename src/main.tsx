@@ -5,8 +5,6 @@ import './index.css'
 import './i18n'
 import { initSentry } from './lib/sentry'
 
-// Boot Sentry before anything else so init-time errors are captured.
-// No-op unless VITE_SENTRY_DSN is set.
 initSentry()
 
 createRoot(document.getElementById('root')!).render(

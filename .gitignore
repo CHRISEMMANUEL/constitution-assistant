@@ -73,5 +73,8 @@ $RECYCLE.BIN/
 
 .Agent/
 *.md
+!README.md
 .Brand-Guideline.md
 .DEPLOY.md
+# Supabase CLI local cache
+supabase/.temp/
