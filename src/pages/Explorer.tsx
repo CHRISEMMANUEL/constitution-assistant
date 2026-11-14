@@ -377,11 +377,11 @@ export const Explorer: React.FC = () => {
       )}
 
       <div
-        className={`grid lg:grid-cols-4 gap-6 lg:gap-8 ${
+        className={`grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8 ${
           activeConstitution && !activeConstitution.indexed ? 'hidden' : ''
         }`}
       >
-        <div className="lg:col-span-1 order-1 lg:order-1">
+        <div className="min-w-0 lg:col-span-1 order-1 lg:order-1">
           <Card className="p-0 lg:p-4 lg:sticky lg:top-28">
             <details className="lg:open:block group" open>
               <summary
@@ -412,7 +412,7 @@ export const Explorer: React.FC = () => {
                         <a
                           href={`#${a.id}`}
                           onClick={() => setActiveArticleId(a.id)}
-                          className={`block py-1 transition-colors ${
+                          className={`block py-1 break-words transition-colors ${
                             activeArticleId === a.id
                               ? 'text-iris-500 font-medium'
                               : 'text-slate dark:text-mist hover:text-iris-500'
@@ -432,7 +432,7 @@ export const Explorer: React.FC = () => {
           </Card>
         </div>
 
-        <div className="lg:col-span-3 order-2 lg:order-2 space-y-5 sm:space-y-8">
+        <div className="min-w-0 lg:col-span-3 order-2 lg:order-2 space-y-5 sm:space-y-8">
           {loading ? (
             <div className="flex justify-center py-16 sm:py-20">
               <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-iris-500/60" />
@@ -449,7 +449,7 @@ export const Explorer: React.FC = () => {
                     <p className="text-[10px] sm:text-xs uppercase tracking-wider text-slate dark:text-mist">
                       {a.chapter}
                     </p>
-                    <h2 className="m-0 text-xl sm:text-2xl md:text-3xl">
+                    <h2 className="m-0 text-xl sm:text-2xl md:text-3xl break-words">
                       {a.article_number} — {a.title}
                     </h2>
                   </div>
