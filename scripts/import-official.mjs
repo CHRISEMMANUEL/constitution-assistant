@@ -105,7 +105,7 @@ async function writeCountry(sb, id, entry, rows) {
     sb
       .from('constitutions')
       .update({
-        summary: `${rows[0].content.slice(0, 380)}…\n\nSource: ${entry.source_name} (${entry.license}).`,
+        summary: `${rows[0].content.slice(0, 380)}…\n\nSource: ${entry.source_name}. Licence: ${entry.license}.`,
         source_name: entry.source_name,
         source_url: entry.source_url,
         license: entry.license,
