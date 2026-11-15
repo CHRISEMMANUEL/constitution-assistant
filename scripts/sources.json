@@ -101,14 +101,26 @@
   },
   "ng": {
     "status": "blocked",
-    "reason": "No reachable official text. Wikisource copy has no source and an unknown version; nass.gov.ng, placng.org and nigeria-law.org time out from here. Keeps Constitute (CC BY-NC; the app is free and non-commercial)."
+    "reason": "No consolidated official text. The Federal Ministry of Justice PDF (justice.gov.ng/wp-content/uploads/2020/09/Nigerian-Constitution.pdf, broken xref, pdftotext fails, pdf.js reads it) is the unamended 1999 text with the First to Third Alteration Acts (2010) appended as amending instructions, not merged; importing it would drop the alterations. Neither it nor Constitute has the Fourth (2018) or Fifth (2023) Alterations. Licence would be fine: Copyright Act 2022, s. 3(b) excludes official legislative texts. Keeps Constitute (CC BY-NC; the app is free and non-commercial)."
   },
   "gh": {
-    "status": "blocked",
-    "reason": "Wikisource copy is marked incomplete; judicial.gov.gh times out from here. Keeps Constitute (CC BY-NC; the app is free and non-commercial)."
+    "status": "ready",
+    "adapter": "gh-osp",
+    "pages": ["https://osp.gov.gh/media/Resources/Ghana_Constitution.pdf"],
+    "source_name": "Constitution of the Republic of Ghana, 1992, as amended by the Constitution of the Republic of Ghana (Amendment) Act, 1996 (Act 527) (consolidated text published by the Office of the Special Prosecutor)",
+    "source_url": "https://osp.gov.gh/media/Resources/Ghana_Constitution.pdf",
+    "license": "Public domain (no economic or moral rights vest in anyone in an enactment, Ghana Copyright Act 2005 (Act 690), s. 8)",
+    "language": "en",
+    "official_translation": null,
+    "expect": {
+      "min": 330,
+      "max": 345,
+      "contains": ["Preamble", "Article 8", "Article 114", "Article 299", "First Schedule, section 1", "First Schedule, section 37", "Second Schedule"],
+      "sequence": { "prefix": "Article ", "from": 1, "to": 299 }
+    }
   },
   "jm": {
     "status": "blocked",
-    "reason": "Not on Wikisource; laws.moj.gov.jm returns 503 from here. Keeps Constitute (CC BY-NC; the app is free and non-commercial)."
+    "reason": "Not on Wikisource; laws.moj.gov.jm shows a maintenance page (503). The treasury.gov.jm PDF is an image scan of the 1962 Order with almost no text layer and predates the 2011 Charter of Fundamental Rights and Freedoms, so it would lose text. Keeps Constitute (CC BY-NC; the app is free and non-commercial)."
   }
 }

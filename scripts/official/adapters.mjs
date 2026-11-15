@@ -865,10 +865,160 @@ async function inLegislative(entry) {
   return { revision: url, articles };
 }
 
+// The OSP copy is Oceana's consolidation to the 1996 Amendment Act: every amended passage is
+// wrapped as N[“...”] with endnote N. Only the markers go; the amended text stays.
+function stripGhAmendmentMarks(text, expected) {
+  let out = text;
+  for (let n = 1; n <= expected; n++) {
+    const open = out.search(new RegExp(`(?<!\\d)${n}\\[`));
+    if (open < 0) throw new Error(`gh: amendment marker ${n}[ not found`);
+    let depth = 0;
+    let close = -1;
+    for (let i = open + String(n).length; i < out.length; i++) {
+      if (out[i] === '[') depth++;
+      else if (out[i] === ']' && --depth === 0) {
+        close = i;
+        break;
+      }
+    }
+    if (close < 0) throw new Error(`gh: amendment marker ${n}[ is never closed`);
+    const inner = out
+      .slice(open + String(n).length + 1, close)
+      .replace(/^“/, '')
+      .replace(/”(\.?)$/, '$1');
+    out = out.slice(0, open) + inner + out.slice(close + 1);
+  }
+  if (/(?<![\d(])\d{1,2}\[/.test(out)) throw new Error('gh: amendment marker left after stripping');
+  return out;
+}
+
+// Paragraphs are separated by blank lines; a page break inside a sentence joins the halves.
+function ghParagraphs(text) {
+  const out = [];
+  let block = [];
+  const flush = () => {
+    if (block.length) out.push(block.join(' '));
+    block = [];
+  };
+  for (const raw of text.split('\n')) {
+    const line = raw.replace(/\f/g, '').trim();
+    if (!line) {
+      flush();
+      continue;
+    }
+    // pdftotext puts the form feed on the first line of the next page, often with no blank
+    // line before it.
+    const pageBreak = raw.includes('\f');
+    const starts = STARTS_GH_BLOCK.test(line);
+    const heading = GH_HEADING.test(line) || GH_ARTICLE_LINE.test(line);
+    const item = starts && /([.;:—,]|\b(and|or))$/.test(block.at(-1) ?? '');
+    if (heading || item) flush();
+    const continues = pageBreak && !block.length && out.length && !/[.;:—”]$/.test(out.at(-1));
+    if (continues && !starts) block = [out.pop()];
+    block.push(line);
+  }
+  flush();
+  return out;
+}
+
+// Checked against the enacted text of Act 527 (1996): Oceana's 11 integrated passages match it
+// except article 199(4), where s. 6 of the Act says "sixty years", not "sixty-five".
+const GH_CORRECTIONS = [
+  [/after\s+attaining\s+the\s+age\s+of\s+sixty-five\s+years\s+may,\s+where\s+the\s+exigencies/, 'after attaining the age of sixty years may, where the exigencies'],
+];
+
+const GH_HEADING = /^(CHAPTER [A-Z-]+|(FIRST|SECOND) SCHEDULE)$/;
+
+const GH_ARTICLE_LINE = /^\d{1,3}\.\s+“?[A-Z][A-Z,.'’ -]{3,}/;
+
+// "40. INTERNATIONAL RELATIONS. In its dealings ..." — the heading can share its line with text.
+const GH_ARTICLE = /^(\d{1,3})\.\s+“?([A-Z][A-Z0-9 ,.'’()&/-]*?[A-Z)])\.{0,2}(?:\s+(?=[A-Z][a-z]|[(“])(.*))?$/;
+
+const STARTS_GH_BLOCK = /^(\(\w{1,5}\)|\d{1,3}[A-Z]?\.\s|CHAPTER |PART [IVX]+$|[A-Z]+ SCHEDULE$)/;
+
+function parseGhana(text) {
+  const start = text.search(/^IN THE NAME OF THE ALMIGHTY GOD$/m);
+  const end = text.search(/^Made this \d+\w* day of May, 1992\.$/m);
+  if (start < 0 || end < 0) throw new Error('gh: preamble or closing "Made this ..." line not found');
+  let body = stripGhAmendmentMarks(text.slice(start, end), 11);
+  for (const [wrong, right] of GH_CORRECTIONS) {
+    if (!wrong.test(body)) throw new Error(`gh: correction no longer applies, recheck: ${wrong}`);
+    body = body.replace(wrong, right);
+  }
+  const chapterOne = body.search(/^CHAPTER ONE$/m);
+  const c = collector();
+  const dropped = [];
+  let chapter = 'Preamble';
+  let schedule = null;
+  let last = 0;
+  // Preamble lines are one recital each; a line only wraps when it has no closing punctuation.
+  c.open('Preamble', 'Preamble');
+  let prev = '';
+  for (const line of body.slice(0, chapterOne).split('\n').map((l) => l.trim()).filter(Boolean)) {
+    const wraps = prev && !/[.;:,]$/.test(prev) && (prev !== prev.toUpperCase() || line === line.toUpperCase());
+    if (wraps) c.current.lines.push(`${c.current.lines.pop()} ${line}`);
+    else c.add(line);
+    prev = line;
+  }
+  const paragraphs = ghParagraphs(body.slice(chapterOne));
+  for (const [i, p] of paragraphs.entries()) {
+    const chap = p.match(/^CHAPTER ([A-Z-]+) (.+)$/);
+    if (chap && !schedule) {
+      chapter = `Chapter ${titleCase(chap[1])} — ${titleCase(chap[2])}`;
+      continue;
+    }
+    const sched = p.match(/^(FIRST|SECOND) SCHEDULE (.+)$/);
+    if (sched) {
+      const name = `${titleCase(sched[1])} Schedule`;
+      const title = titleCase(sched[2]);
+      schedule = name;
+      chapter = `${name} — ${title}`;
+      last = 0;
+      if (name === 'Second Schedule') c.open(chapter, name, title);
+      continue;
+    }
+    if (schedule === 'First Schedule' && /^PART [IVX]+ /.test(p)) continue;
+    if (schedule === 'Second Schedule') {
+      if (/^THE [A-Z -]*OATH[A-Z -]*$/.test(p)) {
+        c.add(titleCase(p));
+        continue;
+      }
+      c.add(p);
+      continue;
+    }
+    const head = p.match(GH_ARTICLE);
+    if (head && Number(head[1]) === last + 1) {
+      last = Number(head[1]);
+      const label = schedule ? `${schedule}, section ${head[1]}` : `Article ${head[1]}`;
+      c.open(chapter, label, titleCase(head[2].replace(/ETC$/, 'ETC.')));
+      if (head[3]) c.add(head[3]);
+      continue;
+    }
+    // Centred group headings ("The Audit Service") sit just above an article heading.
+    const subheading = !/[.;:—,]$/.test(p) && p.length < 80 && GH_ARTICLE.test(paragraphs[i + 1] ?? '');
+    if (subheading || (p === p.toUpperCase() && /[A-Z]{3}/.test(p) && !/[.;:]$/.test(p) && !/^\(/.test(p))) {
+      dropped.push(p);
+      continue;
+    }
+    c.add(p);
+  }
+  return { articles: c.done(), dropped };
+}
+
+async function ghOsp(entry) {
+  const { articles, dropped } = parseGhana(await fetchPdfText(entry.pages[0]));
+  if (dropped.length) {
+    console.log(`\n  gh: ${dropped.length} headings left out (check they are not text):`);
+    for (const d of dropped) console.log(`    ${d.slice(0, 120)}`);
+  }
+  return { revision: entry.pages[0], articles };
+}
+
 export const ADAPTERS = {
   'us-archives': usArchives,
   'au-wikisource': auWikisource,
   'ke-wikisource': keWikisource,
   'za-justice': zaJustice,
   'in-legislative': inLegislative,
+  'gh-osp': ghOsp,
 };
