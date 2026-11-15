@@ -14,9 +14,12 @@ import {
   Square,
   Play,
   StopCircle,
+  KeyRound,
 } from 'lucide-react';
 import { Button } from '../components/Button';
+import { ApiKeyPanel } from '../components/ApiKeyPanel';
 import { answerSmart, type CitedAnswer } from '../services/ai';
+import { providerById, useApiKey, usePreferredModel, useProviderId } from '../services/aiKey';
 import { useVoice } from '../lib/useVoice';
 import { useTranslation } from 'react-i18next';
 
@@ -44,10 +47,9 @@ const confidenceStyles: Record<NonNullable<Message['confidence']>, string> = {
 };
 
 const degradedNotice: Record<NonNullable<Message['degraded']>, string> = {
-  'llm-unavailable':
-    'AI generation is temporarily unavailable. Showing the closest matching passage from the indexed corpus instead.',
-  'profile-only':
-    'No constitutional text is yet indexed for this country — only a basic country profile. The Wikipedia link in the source has fuller information.',
+  'llm-unavailable': 'assistant.llm_unavailable',
+  'invalid-key': 'assistant.invalid_key',
+  'profile-only': 'assistant.profile_only',
 };
 
 const renderReadingText = (text: string, activeIdx: number) => {
@@ -188,6 +190,10 @@ export const Assistant: React.FC = () => {
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
   const [readingWordIndex, setReadingWordIndex] = useState(-1);
+  const apiKey = useApiKey();
+  const aiProvider = providerById(useProviderId());
+  const aiModel = usePreferredModel() || aiProvider.defaultModel;
+  const [showKeyPanel, setShowKeyPanel] = useState(() => !apiKey);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -344,6 +350,21 @@ export const Assistant: React.FC = () => {
           </p>
         </div>
 
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowKeyPanel((v) => !v)}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-full border text-[11px] sm:text-xs transition-colors shrink-0 ${
+              apiKey
+                ? 'border-sage-500 text-sage-500 bg-sage-500/10'
+                : 'border-slate/30 dark:border-ink-700 text-slate dark:text-mist hover:border-iris-500 hover:text-iris-500'
+            }`}
+            title={apiKey ? t('assistant.key_on', { model: aiModel, provider: aiProvider.name }) : t('assistant.key_missing')}
+            aria-expanded={showKeyPanel}
+          >
+            <KeyRound className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>{t('assistant.key_button')}</span>
+          </button>
+
         {voice.supportsSynthesis && (
           <button
             onClick={() => {
@@ -363,7 +384,24 @@ export const Assistant: React.FC = () => {
             <span className="sm:hidden">{autoSpeak ? 'On' : 'Off'}</span>
           </button>
         )}
+        </div>
       </div>
+
+      {showKeyPanel ? (
+        <ApiKeyPanel onClose={() => setShowKeyPanel(false)} />
+      ) : (
+        !apiKey && (
+          <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-honey-500/40 bg-honey-500/10 text-honey-700 dark:text-honey-100">
+            <span>{t('assistant.key_missing')}</span>
+            <button
+              onClick={() => setShowKeyPanel(true)}
+              className="font-medium underline underline-offset-2 hover:text-iris-500"
+            >
+              {t('assistant.key_add')}
+            </button>
+          </div>
+        )
+      )}
 
       {messages.length <= 1 && (
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4">
@@ -428,12 +466,12 @@ export const Assistant: React.FC = () => {
                 {msg.role === 'assistant' && msg.degraded && (
                   <div
                     className={`text-[11px] leading-snug px-3 py-2 rounded-lg border ${
-                      msg.degraded === 'llm-unavailable'
+                      msg.degraded !== 'profile-only'
                         ? 'border-honey-500/40 bg-honey-500/10 text-honey-700 dark:text-honey-100'
                         : 'border-slate/30 bg-slate/5 text-slate dark:text-mist'
                     }`}
                   >
-                    {degradedNotice[msg.degraded]}
+                    {t(degradedNotice[msg.degraded])}
                   </div>
                 )}
 

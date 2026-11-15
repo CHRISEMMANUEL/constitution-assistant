@@ -1,0 +1,249 @@
+import type { ScoredArticle } from './ai';
+import { getApiKey, getPreferredModel, getProvider, type AiProvider } from './aiKey';
+
+const OPENROUTER_FALLBACK_MODELS = [
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+];
+
+const CLAUDE_SERVER_FALLBACK_MODELS = new Set([
+  'claude-fable-5-1',
+  'claude-opus-5-5',
+  'claude-opus-5',
+  'claude-sonnet-5-5',
+]);
+const CLAUDE_EFFORT_MODELS = /^claude-(fable|mythos|opus|sonnet|haiku)-5|^claude-opus-4-[678]/;
+
+export class InvalidKeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidKeyError';
+  }
+}
+
+export const isAiConfigured = (): boolean => !!getApiKey();
+export const aiModel = (): string => getPreferredModel() || getProvider().defaultModel;
+
+const SYSTEM_PROMPT = `You are ConstIntell, a constitutional research assistant.
+
+NON-NEGOTIABLE RULES:
+1. Answer the user's question based ONLY on the CONTEXT block in the user message. Do not use outside knowledge of any constitution, statute, case law, or legal commentary. If you find yourself wanting to cite something not in the CONTEXT, you must not.
+2. If the CONTEXT does not contain enough information to answer, say so plainly using this exact phrasing as your opening line:
+   "The provided sources do not contain a direct answer to that."
+   Then recommend the most closely related source from the list, naming the country and article.
+3. Cite every factual claim inline using the bracket form [Source N], where N is the source number from the CONTEXT. Do not invent source numbers.
+4. When the answer hinges on the exact wording of a constitutional provision, quote it on a new line prefixed with "> " and attribute it: country name + article/section number.
+5. Be concise — at most 3 to 5 short paragraphs. Do not restate the question, pad with filler, or interpret beyond what the text says.
+6. You are a research tool, not legal counsel. Do not give legal advice, predict court outcomes, or recommend actions a person should take.
+7. End every reply with this disclaimer on its own line, exactly:
+_AI responses are informational and not legal advice. Consult a qualified attorney for binding interpretation._`;
+
+const buildContext = (sources: ScoredArticle[]): string =>
+  sources
+    .map(
+      (s, i) =>
+        `[Source ${i + 1}] ${s.constitution.country} — ${s.article.article_number}: ${s.article.title}\nChapter: ${s.article.chapter}\n${s.article.content}`,
+    )
+    .join('\n\n---\n\n');
+
+const buildUserMessage = (question: string, sources: ScoredArticle[]): string =>
+  `CONTEXT:\n---\n${buildContext(sources)}\n---\n\nQuestion: ${question}\n\nAnswer:`;
+
+export interface RagOptions {
+  question: string;
+  sources: ScoredArticle[];
+  signal?: AbortSignal;
+  onToken: (token: string) => void;
+}
+
+interface StreamChunk {
+  choices?: Array<{ delta?: { content?: string } }>;
+}
+
+function chatHeaders(provider: AiProvider, apiKey: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  };
+  if (provider.id === 'openrouter') {
+    headers['HTTP-Referer'] =
+      typeof window !== 'undefined' ? window.location.origin : 'https://ConstIntell.app';
+    headers['X-Title'] = 'ConstIntell';
+  }
+  return headers;
+}
+
+function chatBody(provider: AiProvider, modelId: string, opts: RagOptions): string {
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: buildUserMessage(opts.question, opts.sources) },
+  ];
+  if (provider.id === 'openai') {
+    return JSON.stringify({ model: modelId, stream: true, max_completion_tokens: 4000, messages });
+  }
+  return JSON.stringify({ model: modelId, stream: true, temperature: 0.15, max_tokens: 800, messages });
+}
+
+async function postWithRetry(
+  url: string,
+  headers: Record<string, string>,
+  body: string,
+  signal: AbortSignal | undefined,
+): Promise<Response> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(url, { method: 'POST', headers, body, signal });
+    if (res.status !== 429) return res;
+    if (attempt === 1) return res;
+    const retryAfter = Number(res.headers.get('Retry-After')) * 1000;
+    const wait = Number.isFinite(retryAfter) && retryAfter > 0
+      ? Math.min(retryAfter, 4000)
+      : 1500;
+    await new Promise((r) => setTimeout(r, wait));
+  }
+  throw new Error('Retry loop exhausted');
+}
+
+async function streamFromResponse(
+  res: Response,
+  onToken: (t: string) => void,
+): Promise<void> {
+  if (!res.body) throw new Error('AI response had no body');
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const data = trimmed.slice(5).trim();
+        if (!data || data === '[DONE]') {
+          if (data === '[DONE]') return;
+          continue;
+        }
+        try {
+          const json = JSON.parse(data) as StreamChunk;
+          const delta = json.choices?.[0]?.delta?.content;
+          if (delta) onToken(delta);
+        } catch {
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+const isKeyRejected = (status: number, detail: string): boolean =>
+  status === 401 || status === 403 || (status === 400 && /api[ _-]?key/i.test(detail));
+
+async function streamChatCompletions(
+  provider: AiProvider,
+  apiKey: string,
+  model: string,
+  opts: RagOptions,
+): Promise<void> {
+  const candidates = provider.freeModels && model.endsWith(':free')
+    ? Array.from(new Set([model, ...OPENROUTER_FALLBACK_MODELS]))
+    : [model];
+  const headers = chatHeaders(provider, apiKey);
+
+  let lastErr: unknown;
+  for (let i = 0; i < candidates.length; i++) {
+    const m = candidates[i];
+    try {
+      const res = await postWithRetry(provider.chatUrl, headers, chatBody(provider, m, opts), opts.signal);
+
+      if (res.status === 429) {
+        const detail = await res.text().catch(() => '');
+        lastErr = new Error(`${provider.name} 429 on ${m} — ${detail.slice(0, 200)}`);
+        if (i < candidates.length - 1) {
+          console.info(`[llm] ${m} rate-limited; trying next model.`);
+          continue;
+        }
+        throw lastErr;
+      }
+
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        if (isKeyRejected(res.status, detail)) {
+          throw new InvalidKeyError(`${provider.name} ${res.status} — ${detail.slice(0, 200)}`);
+        }
+        throw new Error(`${provider.name} ${res.status} on ${m} — ${detail.slice(0, 240)}`);
+      }
+
+      await streamFromResponse(res, opts.onToken);
+      return;
+    } catch (err) {
+      const e = err as Error;
+      if (e.name === 'AbortError') throw err;
+      lastErr = err;
+      const msg = e.message || '';
+      if (!msg.includes('429')) throw err;
+    }
+  }
+  throw lastErr ?? new Error(`${provider.name}: all fallback models exhausted`);
+}
+
+async function streamClaude(apiKey: string, model: string, opts: RagOptions): Promise<void> {
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 1 });
+  const params = {
+    model,
+    max_tokens: 8000,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user' as const, content: buildUserMessage(opts.question, opts.sources) }],
+    ...(CLAUDE_EFFORT_MODELS.test(model) ? { output_config: { effort: 'low' as const } } : {}),
+  };
+
+  try {
+    let message: { stop_reason: string | null; model: string };
+    if (CLAUDE_SERVER_FALLBACK_MODELS.has(model)) {
+      const stream = client.beta.messages.stream(
+        { ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' },
+        { signal: opts.signal },
+      );
+      stream.on('text', (delta) => opts.onToken(delta));
+      message = await stream.finalMessage();
+    } else {
+      const stream = client.messages.stream(params, { signal: opts.signal });
+      stream.on('text', (delta) => opts.onToken(delta));
+      message = await stream.finalMessage();
+    }
+    if (message.stop_reason === 'refusal') {
+      throw new Error(`Claude declined to answer on ${message.model}`);
+    }
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      throw new InvalidKeyError(`Claude ${err.status} — ${err.message.slice(0, 200)}`);
+    }
+    if (err instanceof Anthropic.APIUserAbortError) {
+      const abort = new Error('Generation cancelled');
+      abort.name = 'AbortError';
+      throw abort;
+    }
+    throw err;
+  }
+}
+
+export const streamRAG = async (opts: RagOptions): Promise<void> => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new InvalidKeyError('No API key saved.');
+  }
+
+  const provider = getProvider();
+  const model = aiModel();
+  if (provider.id === 'anthropic') {
+    await streamClaude(apiKey, model, opts);
+    return;
+  }
+  await streamChatCompletions(provider, apiKey, model, opts);
+};

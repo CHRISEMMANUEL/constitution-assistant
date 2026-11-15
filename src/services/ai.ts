@@ -11,16 +11,16 @@ import {
   type Constitution,
 } from './api';
 import {
-  isOpenRouterConfigured,
-  openRouterModel,
+  isAiConfigured,
+  aiModel,
   streamRAG,
-} from './openrouter';
+} from './llm';
 
 export interface CitedAnswer {
   reply: string;
   hits: ScoredArticle[];
   confidence: 'high' | 'medium' | 'low';
-  degraded?: 'llm-unavailable' | 'profile-only';
+  degraded?: 'llm-unavailable' | 'invalid-key' | 'profile-only';
 }
 
 export interface ScoredArticle {
@@ -392,8 +392,8 @@ export interface SmartAnswerOptions {
   onSources?: (sources: ScoredArticle[]) => void;
 }
 
-export const ragEnabled = (): boolean => isOpenRouterConfigured();
-export const ragModelLabel = (): string => openRouterModel();
+export const ragEnabled = (): boolean => isAiConfigured();
+export const ragModelLabel = (): string => aiModel();
 
 export const answerSmart = async (
   opts: SmartAnswerOptions,
@@ -425,7 +425,7 @@ export const answerSmart = async (
     return a;
   };
 
-  if (isOpenRouterConfigured()) {
+  if (isAiConfigured()) {
     const sources = retrieveForRAG(trimmed, 6);
     onSources?.(sources);
 
@@ -462,7 +462,8 @@ export const answerSmart = async (
       console.warn('[ai] RAG call failed; falling back to local.', err);
       const fallback = answer(trimmed);
       onToken?.(fallback.reply);
-      return tagProfileOnly({ ...fallback, degraded: 'llm-unavailable' });
+      const degraded = (err as Error).name === 'InvalidKeyError' ? 'invalid-key' : 'llm-unavailable';
+      return tagProfileOnly({ ...fallback, degraded });
     }
   }
 

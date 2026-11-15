@@ -18,7 +18,6 @@ const Bookmarks = lazy(() => import('./pages/Bookmarks').then((m) => ({ default:
 const Privacy = lazy(() => import('./pages/Privacy').then((m) => ({ default: m.Privacy })))
 const Terms = lazy(() => import('./pages/Terms').then((m) => ({ default: m.Terms })))
 const NotFound = lazy(() => import('./pages/NotFound').then((m) => ({ default: m.NotFound })))
-const Pricing = lazy(() => import('./pages/Pricing').then((m) => ({ default: m.Pricing })))
 const BlogList = lazy(() => import('./pages/BlogList').then((m) => ({ default: m.BlogList })))
 const BlogPost = lazy(() => import('./pages/BlogPost').then((m) => ({ default: m.BlogPostPage })))
 
@@ -53,7 +52,6 @@ function App() {
                     <Route path="bookmarks" element={<Bookmarks />} />
                     <Route path="privacy" element={<Privacy />} />
                     <Route path="terms" element={<Terms />} />
-                    <Route path="pricing" element={<Pricing />} />
                     <Route path="blog" element={<BlogList />} />
                     <Route path="blog/:slug" element={<BlogPost />} />
                     <Route path="*" element={<NotFound />} />

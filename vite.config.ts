@@ -29,6 +29,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globIgnores: ['**/assets/sdk-*.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/restcountries\.com\//,

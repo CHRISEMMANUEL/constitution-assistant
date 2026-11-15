@@ -4,10 +4,12 @@ Read, search and compare the constitutions of the world, and ask an AI assistant
 
 Live: https://constitution-assistant.netlify.app
 
+The app is free and non-commercial: no paid plans, no ads. AI answers use each person's own API key.
+
 ## Features
 
 - **Explorer**: browse constitutions by continent, on a world map or by country.
-- **Assistant**: ask questions in plain language. Retrieval finds the most relevant articles, then a language model writes a short answer citing them as `[Source N]`. If no model is reachable, it falls back to quoting the best-matching article directly.
+- **Assistant**: ask questions in plain language. Retrieval finds the most relevant articles, then a language model writes a short answer citing them as `[Source N]`, using your own API key from OpenRouter, OpenAI, Anthropic (Claude), Google Gemini, Groq or xAI (Grok). Without a key, or if no model is reachable, it quotes the best-matching article directly.
 - **Comparisons**: name two or more countries ("compare freedom of expression in Kenya and Ghana") to get evidence from each.
 - **Voice**: speak your question and have answers read aloud (Web Speech API).
 - **Bookmarks**: save articles to your account.
@@ -20,21 +22,39 @@ The assistant is a research tool, not legal advice.
 
 - React 19, TypeScript, Vite, Tailwind CSS 4, Framer Motion
 - Supabase (Postgres, Auth, Edge Functions)
-- OpenRouter for model access (free-tier models by default)
+- Model access through each user's own key: OpenRouter (free models by default), OpenAI, Anthropic via `@anthropic-ai/sdk`, Google Gemini, Groq, xAI
 - vite-plugin-pwa, i18next, Sentry (optional)
 
 ## How the assistant works
 
 1. All articles are loaded from Supabase and indexed in the browser (TF-IDF).
 2. For each question, the top matching articles are selected, with at least one per country named in the question.
-3. The articles and the question are sent through the `openrouter` Supabase Edge Function, which holds the API key, to a free OpenRouter model. The answer streams back.
-4. If the model is rate-limited, the next free model is tried; if all fail, the app shows a direct quotation instead.
+3. If the user has saved an API key, the browser sends the articles and the question straight to the chosen provider with that key. The answer streams back.
+4. On OpenRouter, if a free model is rate-limited, the next free model is tried; if all fail, or the key is rejected, the app shows a direct quotation instead.
+5. With no key saved, the app answers from the index alone by quoting the best-matching articles.
+
+### Your own AI key
+
+There is no shared key. In the Assistant, open **AI key**, choose a provider, paste your key and, optionally, a model id. Leaving the model blank uses the default below.
+
+| Provider | Get a key | Default model | Cost |
+| --- | --- | --- | --- |
+| OpenRouter | https://openrouter.ai/keys | `google/gemma-4-31b-it:free`, with other free models as fallbacks | Free models are free; others are billed by OpenRouter |
+| OpenAI | https://platform.openai.com/api-keys | `gpt-4.1-mini` | Billed by OpenAI |
+| Claude (Anthropic) | https://console.anthropic.com/settings/keys | `claude-opus-5-5` | Billed by Anthropic |
+| Google Gemini | https://aistudio.google.com/apikey | `gemini-2.5-flash` | Free tier available, then billed by Google |
+| Groq | https://console.groq.com/keys | `llama-3.3-70b-versatile` | Free tier available, then billed by Groq |
+| xAI Grok | https://console.x.ai | `grok-3-mini` | Billed by xAI |
+
+The providers are listed in [src/services/aiKey.ts](src/services/aiKey.ts) and called in [src/services/llm.ts](src/services/llm.ts). Claude goes through the official Anthropic SDK, loaded only when Claude is selected; the others use their OpenAI-compatible chat endpoints. Each provider's domain must stay in `connect-src` in [public/_headers](public/_headers).
+
+The key is stored in the browser's `localStorage` and is only ever sent to the provider you chose. It is never saved to Supabase or sent to any server run by this project. **Remove key** deletes it from the browser.
 
 A multi-agent version (planner, per-country researchers, writer and citation verifier running server-side, with support for OpenAI, Anthropic, Google Gemini and Groq using your own API key) is in progress. See [docs/architecture.html](docs/architecture.html).
 
 ## Running locally
 
-Requirements: Node.js 22+, a Supabase project, and optionally an OpenRouter account.
+Requirements: Node.js 22+ and a Supabase project. For AI answers, add your own provider key in the app (not in `.env`).
 
 ```bash
 git clone https://github.com/CHRISEMMANUEL/constitution-assistant.git
@@ -52,9 +72,6 @@ Without Supabase credentials the app runs on the bundled constitutions only.
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | app, seed script | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | app | Supabase anon (public) key |
-| `VITE_OPENROUTER_PROXY_URL` | app | URL of the deployed `openrouter` Edge Function |
-| `VITE_OPENROUTER_MODEL` | app | Optional. Preferred model; must be a `:free` model when using the proxy |
-| `VITE_OPENROUTER_API_KEY` | app | Local development only. Calls OpenRouter directly from the browser, which exposes the key in the bundle. Never set this in production |
 | `VITE_SENTRY_DSN`, `VITE_SENTRY_ENV` | app | Optional error reporting |
 | `SUPABASE_URL` | seed script | Optional alternative to `VITE_SUPABASE_URL` |
 | `SUPABASE_SERVICE_ROLE_KEY` | seed script | Service role key for writing data. Keep it out of the frontend |
@@ -87,17 +104,6 @@ With no country codes it runs every `ready` entry. A country that fails validati
 
 The GitHub Actions workflow [.github/workflows/seed.yml](.github/workflows/seed.yml) runs the full seed on demand from the Actions tab. It needs the repository secrets `VITE_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 
-### AI proxy (Supabase Edge Function)
-
-```bash
-npx supabase functions deploy openrouter --no-verify-jwt
-npx supabase secrets set OPENROUTER_API_KEY=sk-or-v1-...
-```
-
-Then set `VITE_OPENROUTER_PROXY_URL=https://<project-ref>.supabase.co/functions/v1/openrouter`.
-
-The function only accepts requests from the origins listed in `ALLOWED_ORIGINS` at the top of [supabase/functions/openrouter/index.ts](supabase/functions/openrouter/index.ts), only forwards `:free` models, and caps output at 800 tokens. If you deploy your own copy, add your domain to that list.
-
 ## Deployment
 
 The frontend is a static build (`npm run build`, output in `dist/`) deployed on Netlify. `public/_redirects` routes all paths to `index.html` for client-side routing.
@@ -105,7 +111,7 @@ The frontend is a static build (`npm run build`, output in `dist/`) deployed on 
 ## Data sources and attribution
 
 - **Official constitution texts**: for the countries marked `ready` in [scripts/sources.json](scripts/sources.json), taken from official publications (for example the U.S. National Archives, India's Legislative Department, South Africa's Department of Justice and Constitutional Development, and official prints transcribed on [Wikisource](https://en.wikisource.org)). Each country page in the Explorer shows its source and licence.
-- **Other constitution texts**: [Constitute](https://www.constituteproject.org). Elkins, Zachary, Tom Ginsburg, James Melton. *Constitute: The World's Constitutions to Read, Search, and Compare.* Online at constituteproject.org. Licensed under [CC BY-NC 3.0](https://creativecommons.org/licenses/by-nc/3.0/); commercial use of this content is not permitted. Some English translations are provided to Constitute by HeinOnline and Oxford Constitutions of the World.
+- **Other constitution texts**: [Constitute](https://www.constituteproject.org). Elkins, Zachary, Tom Ginsburg, James Melton. *Constitute: The World's Constitutions to Read, Search, and Compare.* Online at constituteproject.org. Licensed under [CC BY-NC 3.0](https://creativecommons.org/licenses/by-nc/3.0/); commercial use of this content is not permitted, which is one reason this app stays free and non-commercial. Some English translations are provided to Constitute by HeinOnline and Oxford Constitutions of the World.
 - **Country summaries**: [Wikipedia](https://en.wikipedia.org), under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - **Country metadata**: [REST Countries](https://restcountries.com).
 - **Bundled offline set**: excerpts from official public-domain constitutional texts.
