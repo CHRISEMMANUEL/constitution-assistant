@@ -77,9 +77,11 @@ Back up the data before any bulk change: `npm run backup:supabase` writes JSON c
 [scripts/sources.json](scripts/sources.json) lists, per country code, where the official text comes from, its licence, and checks the parsed result must pass (article count range, required articles, no gaps in numbering). Countries marked `blocked` give the reason and keep their current source.
 
 ```bash
-npm run import:official -- us au ke          # dry run: fetch, parse, validate, write official-out/<id>.json
-npm run import:official -- us au ke --write  # save to Supabase as source 'official'
+npm run import:official -- us au ke in za          # dry run: fetch, parse, validate, write official-out/<id>.json
+npm run import:official -- us au ke in za --write  # save to Supabase as source 'official'
 ```
+
+India (legislative.gov.in) and the South African schedules (justice.gov.za) are published as PDF, so these two need `pdftotext` from Poppler on the PATH. Git for Windows ships it; on Debian or Ubuntu install `poppler-utils`. The India adapter looks up the current PDF through the Legislative Department's site API rather than a fixed link, and prints the subheadings it leaves out so you can check none of them is text.
 
 With no country codes it runs every `ready` entry. A country that fails validation is never written. On `--write` the official rows are saved first, then the older rows for that country are set to `active = false` (never deleted), and the constitution's source, licence and summary are updated. Official row ids are `<code>-of-<article-slug>`, for example `us-of-amendment-xiv-section-1`. Each source has its own parser in [scripts/official/adapters.mjs](scripts/official/adapters.mjs).
 
@@ -102,7 +104,7 @@ The frontend is a static build (`npm run build`, output in `dist/`) deployed on 
 
 ## Data sources and attribution
 
-- **Official constitution texts**: for the countries marked `ready` in [scripts/sources.json](scripts/sources.json), taken from official publications (for example the U.S. National Archives, and official prints transcribed on [Wikisource](https://en.wikisource.org)). Each country page in the Explorer shows its source and licence.
+- **Official constitution texts**: for the countries marked `ready` in [scripts/sources.json](scripts/sources.json), taken from official publications (for example the U.S. National Archives, India's Legislative Department, South Africa's Department of Justice and Constitutional Development, and official prints transcribed on [Wikisource](https://en.wikisource.org)). Each country page in the Explorer shows its source and licence.
 - **Other constitution texts**: [Constitute](https://www.constituteproject.org). Elkins, Zachary, Tom Ginsburg, James Melton. *Constitute: The World's Constitutions to Read, Search, and Compare.* Online at constituteproject.org. Licensed under [CC BY-NC 3.0](https://creativecommons.org/licenses/by-nc/3.0/); commercial use of this content is not permitted. Some English translations are provided to Constitute by HeinOnline and Oxford Constitutions of the World.
 - **Country summaries**: [Wikipedia](https://en.wikipedia.org), under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - **Country metadata**: [REST Countries](https://restcountries.com).

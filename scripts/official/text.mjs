@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { parse as parseHtml } from 'node-html-parser';
 import { fetchWithRetry, sleep } from '../lib/db.mjs';
 
@@ -95,6 +99,66 @@ export async function fetchHtml(url) {
   });
   if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
   return res.text();
+}
+
+export async function fetchJson(url) {
+  const res = await fetchWithRetry(url, {
+    headers: { ...HEADERS, Accept: 'application/json' },
+    signal: AbortSignal.timeout(90000),
+  });
+  if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPdfText(url) {
+  const res = await fetchWithRetry(url, {
+    headers: { ...HEADERS, Accept: 'application/pdf' },
+    signal: AbortSignal.timeout(300000),
+  });
+  if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'official-'));
+  const file = path.join(dir, 'source.pdf');
+  try {
+    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    return execFileSync('pdftotext', ['-enc', 'UTF-8', '-layout', file, '-'], {
+      encoding: 'utf-8',
+      maxBuffer: 64 * 1024 * 1024,
+    }).replace(/\r\n/g, '\n');
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      throw new Error('pdftotext not found: install poppler-utils (Git for Windows ships it)');
+    }
+    throw err;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const GAP = /\S {3,}\S/;
+
+const STARTS_PARAGRAPH = /^(\d{1,3}\[)*(\([0-9a-zA-Z]{1,6}\)|\d{1,3}[A-Z]{0,3}\.\s|[•“"[*]|Provided|Explanation|Illustration)/;
+
+// firstLineIndent: for PDFs that start each paragraph with an indented first line and wrap
+// at the margin (India), a line only starts a paragraph when it is indented, so a wrapped
+// line that happens to begin with "(a)" or "1. " stays joined.
+export function unwrapPdfLines(lines, { firstLineIndent = false } = {}) {
+  const out = [];
+  let prevIndent = 0;
+  for (const raw of lines) {
+    const text = raw.trim();
+    if (!text) continue;
+    const indent = raw.length - raw.trimStart().length;
+    const last = out.length - 1;
+    const table = GAP.test(text) || (last >= 0 && GAP.test(out[last]));
+    const starts = firstLineIndent
+      ? indent >= 4 && (STARTS_PARAGRAPH.test(text) || /[.;:—\]]$/.test(out[last]))
+      : STARTS_PARAGRAPH.test(text) || (indent > prevIndent + 2 && /[.;:—]$/.test(out[last]));
+    const join = last >= 0 && !table && !starts;
+    if (join) out[last] = /[-—]$/.test(out[last]) ? `${out[last]}${text}` : `${out[last]} ${text}`;
+    else out.push(table ? text.replace(/ {3,}/g, '   ') : text);
+    prevIndent = indent;
+  }
+  return out;
 }
 
 const WIKISOURCE_API = 'https://en.wikisource.org/w/api.php';

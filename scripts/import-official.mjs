@@ -51,8 +51,9 @@ function validate(entry, rows) {
   }
   if (sequence) {
     const gaps = [];
+    const absent = new Set(sequence.absent || []);
     for (let n = sequence.from; n <= sequence.to; n++) {
-      if (!numbers.has(`${sequence.prefix}${n}`)) gaps.push(n);
+      if (!absent.has(n) && !numbers.has(`${sequence.prefix}${n}`)) gaps.push(n);
     }
     if (gaps.length > 0) problems.push(`gaps in ${sequence.prefix.trim()} numbering: ${gaps.join(', ')}`);
   }

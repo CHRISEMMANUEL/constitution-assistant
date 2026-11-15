@@ -51,12 +51,53 @@
     }
   },
   "in": {
-    "status": "blocked",
-    "reason": "Wikisource 'Constitution of India (2020)' is missing Articles 10, 221, 237, 254, 273 and 283, so importing it would hide text Constitute has. Needs an adapter for the official legislative.gov.in PDF (times out from here). Keeps Constitute (free tier only)."
+    "status": "ready",
+    "adapter": "in-legislative",
+    "pages": ["https://www.legislative.gov.in/cms/wp-json/post-page/post?id=18322"],
+    "source_name": "The Constitution of India (English version, Legislative Department, Ministry of Law and Justice)",
+    "source_url": "https://www.legislative.gov.in/constitution-of-india/",
+    "license": "Free to reproduce (Indian Copyright Act 1957, s. 52(1)(q): publishing an Act of a Legislature is not infringement)",
+    "language": "en",
+    "official_translation": null,
+    "expect": {
+      "min": 540,
+      "max": 580,
+      "contains": ["Preamble", "Article 2A", "Article 21A", "Article 243ZT", "Article 394A", "First Schedule", "Sixth Schedule, paragraph 21", "Seventh Schedule, List III", "Tenth Schedule, paragraph 8", "Twelfth Schedule"],
+      "sequence": { "prefix": "Article ", "from": 1, "to": 395, "absent": [238] }
+    }
   },
   "za": {
-    "status": "blocked",
-    "reason": "Wikisource chapter pages predate the 17th (2013) and 18th (2026) amendments, older than the Constitute text. Needs an adapter for gov.za or justice.gov.za. Keeps Constitute (free tier only)."
+    "status": "ready",
+    "adapter": "za-justice",
+    "pages": [
+      "https://www.justice.gov.za/constitution/preamble.html",
+      "https://www.justice.gov.za/constitution/chp01.html",
+      "https://www.justice.gov.za/constitution/chp02.html",
+      "https://www.justice.gov.za/constitution/chp03.html",
+      "https://www.justice.gov.za/constitution/chp04.html",
+      "https://www.justice.gov.za/constitution/chp05.html",
+      "https://www.justice.gov.za/constitution/chp06.html",
+      "https://www.justice.gov.za/constitution/chp07.html",
+      "https://www.justice.gov.za/constitution/chp08.html",
+      "https://www.justice.gov.za/constitution/chp09.html",
+      "https://www.justice.gov.za/constitution/chp10.html",
+      "https://www.justice.gov.za/constitution/chp11.html",
+      "https://www.justice.gov.za/constitution/chp12.html",
+      "https://www.justice.gov.za/constitution/chp13.html",
+      "https://www.justice.gov.za/constitution/chp14.html",
+      "https://www.justice.gov.za/constitution/SAConstitution-web-eng-s-a-combined.pdf"
+    ],
+    "source_name": "Constitution of the Republic of South Africa, 1996 (Department of Justice and Constitutional Development)",
+    "source_url": "https://www.justice.gov.za/constitution/",
+    "license": "Public domain (official legislative text, no copyright under s. 12(8)(a) of the Copyright Act 98 of 1978)",
+    "language": "en",
+    "official_translation": null,
+    "expect": {
+      "min": 290,
+      "max": 320,
+      "contains": ["Preamble", "Section 230A", "Schedule 1", "Schedule 3, Part A, item 9", "Schedule 6, item 28", "Schedule 6, Annexure D", "Schedule 7"],
+      "sequence": { "prefix": "Section ", "from": 1, "to": 243 }
+    }
   },
   "ng": {
     "status": "blocked",
