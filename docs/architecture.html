@@ -56,7 +56,7 @@
 
   <text x="50" y="300" class="warn">✕ no chat history sent · ✕ no citation check</text>
 
-  <rect x="620" y="30" width="320" height="300" rx="10" fill="#f7f5f0" stroke="#b8893b" stroke-dasharray="6 4"/>
+  <rect x="620" y="30" width="320" height="130" rx="10" fill="#f7f5f0" stroke="#b8893b" stroke-dasharray="6 4"/>
   <text x="636" y="54" class="group">SUPABASE</text>
 
   <rect x="650" y="75" width="260" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
@@ -64,18 +64,18 @@
   <text x="662" y="120" class="s">constitutions · articles · bookmarks</text>
 
   <rect x="650" y="190" width="260" height="80" rx="8" fill="#fff" stroke="#1f2a44"/>
-  <text x="662" y="215" class="t">Edge fn: openrouter</text>
-  <text x="662" y="235" class="s">blind passthrough of request body</text>
-  <text x="662" y="252" class="warn">✕ anyone can spend the key</text>
+  <text x="662" y="215" class="t">Direct call from the browser</text>
+  <text x="662" y="235" class="s">user's own key from localStorage</text>
+  <text x="662" y="252" class="s">no shared key, no proxy</text>
 
   <path d="M650,110 C470,110 330,150 272,200" fill="none" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a1)"/>
   <text x="440" y="104" class="lbl">load 25k+ articles</text>
   <line x1="550" y1="230" x2="648" y2="230" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a1)"/>
-  <text x="586" y="222" class="lbl">body</text>
+  <text x="572" y="222" class="lbl">user key</text>
 
   <rect x="650" y="355" width="260" height="55" rx="8" fill="#1f2a44"/>
   <text x="662" y="378" class="t" style="fill:#fff">OpenRouter</text>
-  <text x="662" y="397" class="s" style="fill:#d8c39a">free models (Gemma, Nemotron, Llama)</text>
+  <text x="662" y="397" class="s" style="fill:#d8c39a">user's model, free ones by default</text>
   <line x1="780" y1="270" x2="780" y2="353" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a1)"/>
   <text x="788" y="318" class="lbl">1 call per question</text>
 </svg>
@@ -152,7 +152,7 @@
 
   <rect x="750" y="320" width="190" height="130" rx="8" fill="#1f2a44"/>
   <text x="762" y="346" class="t" style="fill:#fff">OpenRouter models</text>
-  <text x="762" y="368" class="s" style="fill:#d8c39a">key stays server-side</text>
+  <text x="762" y="368" class="s" style="fill:#d8c39a">user's own key (BYOK)</text>
   <text x="762" y="388" class="s" style="fill:#d8c39a">prompts fixed on server</text>
   <text x="762" y="408" class="s" style="fill:#d8c39a">~1 call simple question</text>
   <text x="762" y="428" class="s" style="fill:#d8c39a">~5 calls 3-country compare</text>
@@ -165,7 +165,7 @@
 
 <h2>Phases</h2>
 <ol>
-  <li>Search RPC migration + <code>assistant</code> function with Planner, Researchers, Writer (with chat history); client switches over; retire the passthrough proxy.</li>
+  <li>Search RPC migration + <code>assistant</code> function with Planner, Researchers, Writer (with chat history); client switches over.</li>
   <li>Per-country Analysts for comparisons + Verifier.</li>
   <li>Tutor/quiz agent + agent step timeline in the UI.</li>
 </ol>
