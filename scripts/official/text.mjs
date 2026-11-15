@@ -110,6 +110,17 @@ export async function fetchJson(url) {
   return res.json();
 }
 
+// Git for Windows ships pdftotext in mingw64\bin, which only Git Bash puts on PATH.
+function pdftotextBin() {
+  if (process.platform !== 'win32') return 'pdftotext';
+  const roots = [process.env.ProgramFiles, process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')];
+  for (const root of roots.filter(Boolean)) {
+    const bin = path.join(root, 'Git', 'mingw64', 'bin', 'pdftotext.exe');
+    if (fs.existsSync(bin)) return bin;
+  }
+  return 'pdftotext';
+}
+
 export async function fetchPdfText(url) {
   const res = await fetchWithRetry(url, {
     headers: { ...HEADERS, Accept: 'application/pdf' },
@@ -120,7 +131,7 @@ export async function fetchPdfText(url) {
   const file = path.join(dir, 'source.pdf');
   try {
     fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
-    return execFileSync('pdftotext', ['-enc', 'UTF-8', '-layout', file, '-'], {
+    return execFileSync(pdftotextBin(), ['-enc', 'UTF-8', '-layout', file, '-'], {
       encoding: 'utf-8',
       maxBuffer: 64 * 1024 * 1024,
     }).replace(/\r\n/g, '\n');
