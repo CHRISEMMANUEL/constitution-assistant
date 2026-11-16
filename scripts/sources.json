@@ -101,7 +101,7 @@
   },
   "ng": {
     "status": "blocked",
-    "reason": "Adapter built and passing, not yet imported. The Federal Ministry of Justice PDF's 1999 text differs from the enacted wording in places (for example s. 123(2) 'within 30 days', s. 162(5), s. 185(1), s. 277(2), and a margin note 'Appeals from the Constitutional Court' on s. 233), leaves out s. 84(6) and s. 136(2), and has printing typos. Constitute lacks about 119 sections. Neither has the Fourth (2018) or Fifth (2023) Alterations. Keeps Constitute (CC BY-NC; the app is free and non-commercial) until this is decided; set status to ready to import.",
+    "reason": "Decided 2026-11-16: keep Constitute. The adapter works, but the Federal Ministry of Justice PDF's 1999 text differs from the enacted wording in places (for example s. 123(2) 'within 30 days', s. 162(5), s. 185(1), s. 277(2), and a margin note 'Appeals from the Constitutional Court' on s. 233), leaves out s. 84(6) and s. 136(2), and has many printing typos, while Constitute's text is closer to the enacted wording. Constitute lacks only ss. 19-24, s. 37 and a few schedule rows. Neither has the Fourth (2018) or Fifth (2023) Alterations. Revisit if the app starts charging (Constitute is CC BY-NC) or a clean gazette copy or a 4th/5th Alteration source appears.",
     "adapter": "ng-justice",
     "pages": ["https://justice.gov.ng/wp-content/uploads/2020/09/Nigerian-Constitution.pdf"],
     "source_name": "Constitution of the Federal Republic of Nigeria, 1999, with the Constitution (First, Second and Third Alteration) Acts, 2010 applied (Federal Ministry of Justice print; alterations applied by this project)",
