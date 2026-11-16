@@ -16,6 +16,7 @@ export interface CitedAnswer {
   hits: ScoredArticle[];
   confidence: 'high' | 'medium' | 'low';
   degraded?: 'llm-unavailable' | 'invalid-key' | 'profile-only';
+  unverifiedQuotes?: number;
 }
 
 export interface ScoredArticle {

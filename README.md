@@ -27,11 +27,13 @@ The assistant is a research tool, not legal advice.
 
 ## How the assistant works
 
-With an API key saved, each question goes through three agents, all run in the browser ([src/services/agents.ts](src/services/agents.ts)), so the key is only ever sent to the chosen provider:
+With an API key saved, each question goes through these agents, all run in the browser ([src/services/agents.ts](src/services/agents.ts)), so the key is only ever sent to the chosen provider:
 
 1. **Planner** (one model call): reads the question and the recent conversation and returns up to four keyword searches, each tied to the countries it is about. A comparison gets one search per country, and a follow-up such as "what about Kenya?" is resolved from the earlier turns. If the reply can't be used, the question as typed becomes the search.
 2. **Researchers** (no model call): run the searches in parallel through the `search_articles` Postgres full-text function, then merge the results in turn, up to eight articles. Articles that contain every search term rank first.
-3. **Writer** (one streamed model call): answers from those articles only, cites them as [Source N], and sees the last few turns of the conversation so follow-ups read naturally.
+3. **Analysts** (comparisons only, one model call per country, in parallel): when the searches cover two or more countries, each analyst reads only its country's articles and writes short notes for the Writer, keeping the same [Source N] numbers. A country with no matching article gets a "no source found" note instead of a call. If one analyst fails, the Writer goes without its notes.
+4. **Writer** (one streamed model call): answers from those articles only, cites them as [Source N], and sees the last few turns of the conversation so follow-ups read naturally.
+5. **Verifier** (code, no model call; [src/services/verifier.ts](src/services/verifier.ts)): checks that every [Source N] exists, that every quote appears word for word in a source (ignoring case and punctuation, allowing `…` and `[bracketed]` edits), and that the answer cites something unless it opens with "The provided sources do not contain a direct answer". If anything fails, the Writer is asked once to rewrite the answer with the problems listed. Citations that still point past the source list are removed, and a quote that still doesn't match shows a warning under the answer.
 
 On OpenRouter, if a free model is rate-limited, the next free model is tried. If the key is rejected or the provider fails, the app shows a direct quotation instead. If the search function isn't installed yet, the Researchers use the in-browser TF-IDF index (all articles, loaded from Supabase at startup). With no key saved, the app answers from that index alone by quoting the best-matching articles.
 
@@ -52,7 +54,7 @@ The providers are listed in [src/services/aiKey.ts](src/services/aiKey.ts) and c
 
 The key is stored in the browser's `localStorage` and is only ever sent to the provider you chose. It is never saved to Supabase or sent to any server run by this project. **Remove key** deletes it from the browser.
 
-A multi-agent version (planner, per-country researchers, writer and citation verifier running server-side, with support for OpenAI, Anthropic, Google Gemini and Groq using your own API key) is in progress. See [docs/architecture.html](docs/architecture.html).
+The agent design and the remaining phase (Tutor/quiz agent, agent timeline in the chat) are in [docs/architecture.html](docs/architecture.html).
 
 ## Running locally
 

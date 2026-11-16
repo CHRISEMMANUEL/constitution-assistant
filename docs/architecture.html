@@ -23,7 +23,7 @@
 <body>
 <main>
 <h1>Constitution Assistant: architecture</h1>
-<p>The original single-call RAG pipeline, and the multi-agent version replacing it. Phase 1 (Planner, Researchers, Writer, chat history) is built. It runs in the browser, because each user brings their own key and the key never leaves the browser.</p>
+<p>The original single-call RAG pipeline, and the multi-agent version replacing it. Phase 1 (Planner, Researchers, Writer, chat history) and Phase 2 (per-country Analysts, Verifier) are built. It runs in the browser, because each user brings their own key and the key never leaves the browser.</p>
 
 <h2>Before: one model call, retrieval in the browser</h2>
 <svg viewBox="0 0 960 430" role="img" aria-label="Current architecture diagram">
@@ -150,12 +150,13 @@
   <text x="762" y="220" class="s">search_articles() RPC</text>
   <line x1="665" y1="205" x2="748" y2="205" stroke="#1f2a44" stroke-width="1.5" marker-start="url(#a2)" marker-end="url(#a2)"/>
 
-  <rect x="750" y="320" width="190" height="130" rx="8" fill="#1f2a44"/>
+  <rect x="750" y="320" width="190" height="140" rx="8" fill="#1f2a44"/>
   <text x="762" y="346" class="t" style="fill:#fff">Your AI provider</text>
   <text x="762" y="368" class="s" style="fill:#d8c39a">user's own key (BYOK)</text>
   <text x="762" y="388" class="s" style="fill:#d8c39a">called from the browser</text>
-  <text x="762" y="408" class="s" style="fill:#d8c39a">~1 call simple question</text>
-  <text x="762" y="428" class="s" style="fill:#d8c39a">~5 calls 3-country compare</text>
+  <text x="762" y="408" class="s" style="fill:#d8c39a">2 calls simple question</text>
+  <text x="762" y="428" class="s" style="fill:#d8c39a">5 calls 3-country compare</text>
+  <text x="762" y="446" class="s" style="fill:#d8c39a">+1 when a repair is needed</text>
 
   <path d="M665,105 C720,105 730,330 748,340" fill="none" stroke="#b8893b" stroke-width="1.2" stroke-dasharray="5 4"/>
   <line x1="665" y1="305" x2="748" y2="360" stroke="#b8893b" stroke-width="1.2" stroke-dasharray="5 4"/>
@@ -166,7 +167,7 @@
 <h2>Phases</h2>
 <ol>
   <li>Done: <code>search_articles</code> RPC migration, and Planner, Researchers and Writer (with chat history) in <code>src/services/agents.ts</code>.</li>
-  <li>Per-country Analysts for comparisons + Verifier.</li>
+  <li>Done: per-country Analysts for comparisons (<code>agents.ts</code>) and the code Verifier (<code>src/services/verifier.ts</code>) with one repair.</li>
   <li>Tutor/quiz agent + agent step timeline in the UI.</li>
 </ol>
 </main>

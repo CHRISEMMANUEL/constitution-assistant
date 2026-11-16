@@ -32,6 +32,7 @@ type Message = {
   citations?: CitedAnswer['hits'];
   confidence?: CitedAnswer['confidence'];
   degraded?: CitedAnswer['degraded'];
+  unverifiedQuotes?: number;
 };
 
 const SUGGESTIONS = [
@@ -50,7 +51,9 @@ const confidenceStyles: Record<NonNullable<Message['confidence']>, string> = {
 const stageLabel: Record<AgentStage, string> = {
   planning: 'assistant.stage_planning',
   searching: 'assistant.finding_sources',
+  analyzing: 'assistant.stage_analyzing',
   writing: 'assistant.stage_writing',
+  repairing: 'assistant.stage_repairing',
 };
 
 const degradedNotice: Record<NonNullable<Message['degraded']>, string> = {
@@ -286,6 +289,11 @@ export const Assistant: React.FC = () => {
             ),
           );
         },
+        onReset: () => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === aiId ? { ...m, content: '' } : m)),
+          );
+        },
       });
 
       setMessages((prev) =>
@@ -298,6 +306,7 @@ export const Assistant: React.FC = () => {
                 citations: result.hits,
                 confidence: result.confidence,
                 degraded: result.degraded,
+                unverifiedQuotes: result.unverifiedQuotes,
               }
             : m,
         ),
@@ -489,6 +498,12 @@ export const Assistant: React.FC = () => {
                     }`}
                   >
                     {t(degradedNotice[msg.degraded])}
+                  </div>
+                )}
+
+                {msg.role === 'assistant' && !!msg.unverifiedQuotes && (
+                  <div className="text-[11px] leading-snug px-3 py-2 rounded-lg border border-honey-500/40 bg-honey-500/10 text-honey-700 dark:text-honey-100">
+                    {t('assistant.unverified_quotes')}
                   </div>
                 )}
 

@@ -10,9 +10,10 @@ import {
   type CitedAnswer,
   type ScoredArticle,
 } from './ai';
-import { completeChat, isAiConfigured, streamRAG, type ChatTurn } from './llm';
+import { completeChat, isAiConfigured, sourceBlock, streamRAG, type ChatTurn } from './llm';
+import { describeProblems, problemCount, stripBadCitations, verifyAnswer } from './verifier';
 
-export type AgentStage = 'planning' | 'searching' | 'writing';
+export type AgentStage = 'planning' | 'searching' | 'analyzing' | 'writing' | 'repairing';
 
 export interface PlannedSearch {
   query: string;
@@ -37,6 +38,14 @@ Reply with one JSON object and nothing else, in this shape:
 - When the question compares countries, make one search per country.
 - query: 2 to 8 keywords likely to appear in constitutional text, for example "freedom expression speech press". Not a sentence.
 - countries: English names of the countries the search is about, or [] to search every country.`;
+
+const ANALYST_PROMPT = `You are one analyst on a team comparing national constitutions. You see the provisions of ONE country only.
+Write notes for the writer who will compose the final comparison:
+- 2 to 5 bullet points on what these provisions say about the question.
+- End each bullet with the [Source N] it comes from, using only the source numbers shown.
+- When the exact wording matters, include it as a short quote in double quotes, copied word for word.
+- If none of the provisions address the question, reply with this one line: "No provision among these sources addresses this."
+- Use no outside knowledge. Do not write the comparison itself.`;
 
 const stripForHistory = (text: string): string =>
   text
@@ -175,12 +184,72 @@ async function research(searches: PlannedSearch[]): Promise<Findings> {
   return { sources: interleave(lists, MAX_SOURCES), confidence: confidenceFromScore(best) };
 }
 
+// A comparison is any plan whose searches name two or more countries; each gets an analyst.
+const comparedCountries = (searches: PlannedSearch[]): string[] => [
+  ...new Set(searches.flatMap((s) => s.countryIds)),
+];
+
+async function analyzeCountry(
+  question: string,
+  search: string,
+  country: string,
+  numbered: Array<{ n: number; source: ScoredArticle }>,
+  signal?: AbortSignal,
+): Promise<string> {
+  const blocks = numbered.map(({ n, source }) => sourceBlock(source, n)).join('\n\n---\n\n');
+  const reply = await completeChat(
+    ANALYST_PROMPT,
+    [
+      {
+        role: 'user',
+        content: `Country: ${country}\nQuestion: ${question}\nSearch used: ${search}\n\nSOURCES:\n---\n${blocks}\n---`,
+      },
+    ],
+    signal,
+    'analyze',
+  );
+  return reply.trim();
+}
+
+async function analyze(
+  question: string,
+  searches: PlannedSearch[],
+  sources: ScoredArticle[],
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  const countryIds = comparedCountries(searches);
+  if (countryIds.length < 2) return undefined;
+
+  const byId = await constitutionsById();
+  const notes = await Promise.all(
+    countryIds.map(async (id) => {
+      const name = byId.get(id)?.country ?? id;
+      const numbered = sources
+        .map((source, i) => ({ n: i + 1, source }))
+        .filter(({ source }) => source.constitution.id === id);
+      if (numbered.length === 0) return `## ${name}\nNo source for ${name} was found in the indexed text.`;
+      const search = searches.find((s) => s.countryIds.includes(id))?.query ?? question;
+      try {
+        return `## ${name}\n${await analyzeCountry(question, search, name, numbered, signal)}`;
+      } catch (err) {
+        const errName = (err as Error).name;
+        if (errName === 'AbortError' || errName === 'InvalidKeyError') throw err;
+        console.warn(`[agents] analyst for ${name} failed, the writer goes without its notes.`, err);
+        return null;
+      }
+    }),
+  );
+  const usable = notes.filter((n): n is string => n !== null);
+  return usable.length ? usable.join('\n\n') : undefined;
+}
+
 export interface SmartAnswerOptions {
   query: string;
   history?: ChatTurn[];
   signal?: AbortSignal;
   onStage?: (stage: AgentStage) => void;
   onToken?: (token: string) => void;
+  onReset?: () => void;
   onSources?: (sources: ScoredArticle[]) => void;
 }
 
@@ -191,6 +260,57 @@ const tagProfileOnly = (a: CitedAnswer): CitedAnswer => {
   }
   return a;
 };
+
+interface Draft {
+  question: string;
+  sources: ScoredArticle[];
+  history: ChatTurn[];
+  notes?: string;
+  text: string;
+}
+
+// The verifier is code, not a model: it checks citation numbers and quotes against the sources and
+// asks the writer for one rewrite when something is off. Citations still out of range are dropped.
+async function verifyAndRepair(
+  draft: Draft,
+  opts: SmartAnswerOptions,
+): Promise<{ reply: string; unverifiedQuotes: number }> {
+  const { sources } = draft;
+  const report = verifyAnswer(draft.text, sources);
+  if (problemCount(report) === 0) return { reply: draft.text, unverifiedQuotes: 0 };
+
+  console.warn('[agents] verifier found problems, asking the writer for one repair.', report);
+  opts.onStage?.('repairing');
+  opts.onReset?.();
+  let repaired = '';
+  try {
+    await streamRAG({
+      question: draft.question,
+      sources,
+      history: draft.history,
+      notes: draft.notes,
+      repair: { draft: draft.text, problems: describeProblems(report, sources.length) },
+      signal: opts.signal,
+      onToken: (t) => {
+        repaired += t;
+        opts.onToken?.(t);
+      },
+    });
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') throw err;
+    console.warn('[agents] repair failed, keeping the first draft.', err);
+    repaired = '';
+  }
+
+  const second = repaired.trim() ? verifyAnswer(repaired, sources) : null;
+  const useRepair = second !== null && problemCount(second) <= problemCount(report);
+  const chosen = useRepair ? repaired.trim() : draft.text;
+  const final = useRepair ? second : report;
+  return {
+    reply: stripBadCitations(chosen, sources.length),
+    unverifiedQuotes: final.unmatchedQuotes.length,
+  };
+}
 
 async function localAnswer(query: string): Promise<CitedAnswer> {
   await waitForCorpus();
@@ -237,21 +357,39 @@ export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer
       return tagProfileOnly(fallback);
     }
 
+    if (comparedCountries(searches).length > 1) onStage?.('analyzing');
+    const notes = await analyze(trimmed, searches, findings.sources, signal);
+
     onStage?.('writing');
     await streamRAG({
       question: trimmed,
       sources: findings.sources,
       history,
+      notes,
       signal,
       onToken: (t) => {
         accumulated += t;
         onToken?.(t);
       },
     });
+    const text = accumulated.trim();
+    if (!text) {
+      return tagProfileOnly({
+        reply: (await localAnswer(trimmed)).reply,
+        hits: findings.sources,
+        confidence: findings.confidence,
+      });
+    }
+
+    const checked = await verifyAndRepair(
+      { question: trimmed, sources: findings.sources, history, notes, text },
+      opts,
+    );
     return tagProfileOnly({
-      reply: accumulated.trim() || (await localAnswer(trimmed)).reply,
+      reply: checked.reply,
       hits: findings.sources,
       confidence: findings.confidence,
+      ...(checked.unverifiedQuotes ? { unverifiedQuotes: checked.unverifiedQuotes } : {}),
     });
   } catch (err) {
     if ((err as Error).name === 'AbortError') {

@@ -40,27 +40,33 @@ NON-NEGOTIABLE RULES:
 7. End every reply with this disclaimer on its own line, exactly:
 _AI responses are informational and not legal advice. Consult a qualified attorney for binding interpretation._`;
 
-const buildContext = (sources: ScoredArticle[]): string =>
-  sources
-    .map(
-      (s, i) =>
-        `[Source ${i + 1}] ${s.constitution.country} — ${s.article.article_number}: ${s.article.title}\nChapter: ${s.article.chapter}\n${s.article.content}`,
-    )
-    .join('\n\n---\n\n');
+export const sourceBlock = (s: ScoredArticle, n: number): string =>
+  `[Source ${n}] ${s.constitution.country} — ${s.article.article_number}: ${s.article.title}\nChapter: ${s.article.chapter}\n${s.article.content}`;
 
-const buildUserMessage = (question: string, sources: ScoredArticle[]): string =>
-  `CONTEXT:\n---\n${buildContext(sources)}\n---\n\nQuestion: ${question}\n\nAnswer:`;
+const buildContext = (sources: ScoredArticle[]): string =>
+  sources.map((s, i) => sourceBlock(s, i + 1)).join('\n\n---\n\n');
+
+const buildUserMessage = (question: string, sources: ScoredArticle[], notes?: string): string => {
+  const analysis = notes
+    ? `\n\nANALYST NOTES (one analyst per country read only that country's sources; use them to structure a side-by-side comparison, but check every point against the CONTEXT, which wins if they disagree):\n${notes}`
+    : '';
+  return `CONTEXT:\n---\n${buildContext(sources)}\n---${analysis}\n\nQuestion: ${question}\n\nAnswer:`;
+};
+
+const repairMessage = (problems: string[]): string =>
+  `Your answer above has these problems:\n${problems.map((p) => `- ${p}`).join('\n')}\n\nRewrite the whole answer with them fixed. Keep everything that was correct and follow all the rules.`;
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
 }
 
-type RequestKind = 'answer' | 'plan';
+export type RequestKind = 'answer' | 'plan' | 'analyze';
 
 const TOKEN_LIMITS: Record<RequestKind, { chat: number; openai: number; claude: number }> = {
   answer: { chat: 800, openai: 4000, claude: 8000 },
   plan: { chat: 600, openai: 2000, claude: 2000 },
+  analyze: { chat: 500, openai: 2000, claude: 2000 },
 };
 
 interface ChatRequest {
@@ -75,6 +81,8 @@ export interface RagOptions {
   question: string;
   sources: ScoredArticle[];
   history?: ChatTurn[];
+  notes?: string;
+  repair?: { draft: string; problems: string[] };
   signal?: AbortSignal;
   onToken: (token: string) => void;
 }
@@ -279,7 +287,13 @@ export const streamRAG = (opts: RagOptions): Promise<void> =>
     system: SYSTEM_PROMPT,
     messages: [
       ...(opts.history ?? []),
-      { role: 'user', content: buildUserMessage(opts.question, opts.sources) },
+      { role: 'user', content: buildUserMessage(opts.question, opts.sources, opts.notes) },
+      ...(opts.repair
+        ? [
+            { role: 'assistant' as const, content: opts.repair.draft },
+            { role: 'user' as const, content: repairMessage(opts.repair.problems) },
+          ]
+        : []),
     ],
     signal: opts.signal,
     onToken: opts.onToken,
@@ -289,10 +303,11 @@ export const completeChat = async (
   system: string,
   messages: ChatTurn[],
   signal?: AbortSignal,
+  kind: RequestKind = 'plan',
 ): Promise<string> => {
   let text = '';
   await runChat({
-    kind: 'plan',
+    kind,
     system,
     messages,
     signal,
