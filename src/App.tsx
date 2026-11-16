@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { ThemeProvider } from './context/ThemeContext'
@@ -7,7 +7,6 @@ import { DataProvider } from './context/DataContext'
 import { Layout } from './components/Layout'
 import { Home } from './pages/Home'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { preloadCorpus } from './services/ai'
 
 
 const Explorer = lazy(() => import('./pages/Explorer').then((m) => ({ default: m.Explorer })))
@@ -28,9 +27,6 @@ const PageLoader = () => (
 )
 
 function App() {
-  useEffect(() => {
-    preloadCorpus();
-  }, []);
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="system">

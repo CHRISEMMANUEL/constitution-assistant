@@ -207,11 +207,9 @@ export const isCorpusReady = (): boolean => indexCache?.source === 'supabase';
 export const isCorpusLoading = (): boolean =>
   !!preloadPromise && !isCorpusReady();
 
+// The full corpus (~43k articles) is only downloaded the first time a local search needs it.
 export async function waitForCorpus(): Promise<void> {
-  if (preloadPromise && !isCorpusReady()) {
-    await preloadPromise.catch(() => {
-    });
-  }
+  await preloadCorpus();
 }
 
 let countryPatterns: Promise<Array<{ pattern: RegExp; id: string }>> | null = null;
