@@ -34,6 +34,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "node-html-parser": "^7.1.0",
+    "pdfjs-dist": "^4.10.38",
     "supabase": "^2.98.2",
     "tailwindcss": "^4.2.4",
     "typescript": "~6.0.2",

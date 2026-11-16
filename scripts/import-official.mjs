@@ -134,7 +134,8 @@ async function main() {
 
   for (const id of ids) {
     const entry = REGISTRY[id];
-    if (entry.status !== 'ready') {
+    // A country that is not ready can still be dry-run when named, if it has an adapter.
+    if (entry.status !== 'ready' && (write || !requested.includes(id) || !entry.adapter)) {
       console.log(`${id}  skipped (${entry.status}): ${entry.reason || ''}`);
       continue;
     }

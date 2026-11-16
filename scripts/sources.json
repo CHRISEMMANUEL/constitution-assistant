@@ -101,7 +101,20 @@
   },
   "ng": {
     "status": "blocked",
-    "reason": "No consolidated official text. The Federal Ministry of Justice PDF (justice.gov.ng/wp-content/uploads/2020/09/Nigerian-Constitution.pdf, broken xref, pdftotext fails, pdf.js reads it) is the unamended 1999 text with the First to Third Alteration Acts (2010) appended as amending instructions, not merged; importing it would drop the alterations. Neither it nor Constitute has the Fourth (2018) or Fifth (2023) Alterations. Licence would be fine: Copyright Act 2022, s. 3(b) excludes official legislative texts. Keeps Constitute (CC BY-NC; the app is free and non-commercial)."
+    "reason": "Adapter built and passing, not yet imported. The Federal Ministry of Justice PDF's 1999 text differs from the enacted wording in places (for example s. 123(2) 'within 30 days', s. 162(5), s. 185(1), s. 277(2), and a margin note 'Appeals from the Constitutional Court' on s. 233), leaves out s. 84(6) and s. 136(2), and has printing typos. Constitute lacks about 119 sections. Neither has the Fourth (2018) or Fifth (2023) Alterations. Keeps Constitute (CC BY-NC; the app is free and non-commercial) until this is decided; set status to ready to import.",
+    "adapter": "ng-justice",
+    "pages": ["https://justice.gov.ng/wp-content/uploads/2020/09/Nigerian-Constitution.pdf"],
+    "source_name": "Constitution of the Federal Republic of Nigeria, 1999, with the Constitution (First, Second and Third Alteration) Acts, 2010 applied (Federal Ministry of Justice print; alterations applied by this project)",
+    "source_url": "https://justice.gov.ng/wp-content/uploads/2020/09/Nigerian-Constitution.pdf",
+    "license": "Public domain (official legislative texts are not eligible for copyright, Nigeria Copyright Act 2022, s. 3(b))",
+    "language": "en",
+    "official_translation": null,
+    "expect": {
+      "min": 485,
+      "max": 500,
+      "contains": ["Preamble", "Section 1", "Section 145", "Section 254A", "Section 254F", "Section 320", "First Schedule, Part I, Abia", "Second Schedule, Part I, item 68", "Sixth Schedule", "Seventh Schedule, Judicial Oath"],
+      "sequence": { "prefix": "Section ", "from": 1, "to": 320 }
+    }
   },
   "gh": {
     "status": "ready",

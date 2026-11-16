@@ -7,6 +7,7 @@ import {
   unwrapPdfLines,
   wikisourceSubpages,
 } from './text.mjs';
+import { ngJustice } from './nigeria.mjs';
 
 function collector() {
   const articles = [];
@@ -1021,4 +1022,5 @@ export const ADAPTERS = {
   'za-justice': zaJustice,
   'in-legislative': inLegislative,
   'gh-osp': ghOsp,
+  'ng-justice': ngJustice,
 };

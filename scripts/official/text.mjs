@@ -145,6 +145,39 @@ export async function fetchPdfText(url) {
   }
 }
 
+// Positioned text for PDFs where layout text is not enough (margin notes glued to the body).
+// pdf.js also reads files whose cross-reference table pdftotext rejects.
+export async function readPdfPages(data) {
+  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const doc = await getDocument({ data: new Uint8Array(data), verbosity: 0 }).promise;
+  const pages = [];
+  for (let n = 1; n <= doc.numPages; n++) {
+    const { items } = await (await doc.getPage(n)).getTextContent();
+    pages.push(
+      items
+        .filter((it) => it.str.trim())
+        .map((it) => ({
+          s: it.str,
+          x: it.transform[4],
+          X: it.transform[4] + it.width,
+          y: it.transform[5],
+          h: Math.abs(it.transform[3]),
+        })),
+    );
+  }
+  await doc.destroy();
+  return pages;
+}
+
+export async function fetchPdfPages(url) {
+  const res = await fetchWithRetry(url, {
+    headers: { ...HEADERS, Accept: 'application/pdf' },
+    signal: AbortSignal.timeout(300000),
+  });
+  if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
+  return readPdfPages(await res.arrayBuffer());
+}
+
 const GAP = /\S {3,}\S/;
 
 const STARTS_PARAGRAPH = /^(\d{1,3}\[)*(\([0-9a-zA-Z]{1,6}\)|\d{1,3}[A-Z]{0,3}\.\s|[•“"[*]|Provided|Explanation|Illustration)/;
