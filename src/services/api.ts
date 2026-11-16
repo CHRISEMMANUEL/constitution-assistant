@@ -27,6 +27,8 @@ export type { Region };
 
 const isPlaceholderEnv = !import.meta.env.VITE_SUPABASE_URL;
 
+const ARTICLE_COLUMNS = 'id,constitution_id,chapter,article_number,title,content,ord,source,active,created_at';
+
 const profileToConstitution = (p: CountryProfile): Constitution => ({
   id: p.id,
   country: p.country,
@@ -102,7 +104,7 @@ export const fetchArticles = async (
   try {
     const { data, error } = await supabase
       .from('articles')
-      .select('*')
+      .select(ARTICLE_COLUMNS)
       .eq('constitution_id', constitutionId)
       .eq('active', true)
       .order('ord', { ascending: true, nullsFirst: false });
@@ -123,7 +125,7 @@ export const fetchAllArticles = async (): Promise<Article[]> => {
     for (let from = 0; ; from += PAGE_SIZE) {
       const { data, error } = await supabase
         .from('articles')
-        .select('*')
+        .select(ARTICLE_COLUMNS)
         .eq('active', true)
         .order('constitution_id', { ascending: true })
         .order('ord', { ascending: true, nullsFirst: false })
@@ -140,4 +142,27 @@ export const fetchAllArticles = async (): Promise<Article[]> => {
     console.warn('[api] all-articles fetch failed, using bundled.', err);
     return bundledArticles;
   }
+};
+
+export interface ArticleSearchHit extends Article {
+  rank: number;
+  matched_all: boolean;
+}
+
+export const searchArticles = async (
+  query: string,
+  countryIds: string[],
+  k: number,
+): Promise<ArticleSearchHit[] | null> => {
+  if (isPlaceholderEnv) return null;
+  const { data, error } = await supabase.rpc('search_articles', {
+    query,
+    country_ids: countryIds.length ? countryIds : null,
+    k,
+  });
+  if (error) {
+    console.warn('[api] search_articles failed, using the in-browser index.', error);
+    return null;
+  }
+  return (data ?? []) as ArticleSearchHit[];
 };

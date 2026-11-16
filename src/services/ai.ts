@@ -10,11 +10,6 @@ import {
   type Article,
   type Constitution,
 } from './api';
-import {
-  isAiConfigured,
-  aiModel,
-  streamRAG,
-} from './llm';
 
 export interface CitedAnswer {
   reply: string;
@@ -63,6 +58,16 @@ interface CorpusIndex {
 
 let indexCache: CorpusIndex | null = null;
 let preloadPromise: Promise<void> | null = null;
+let constitutionsPromise: Promise<Map<string, BundledConstitution | Constitution>> | null = null;
+
+export function constitutionsById(): Promise<Map<string, BundledConstitution | Constitution>> {
+  if (!constitutionsPromise) {
+    constitutionsPromise = fetchConstitutions()
+      .then((cs) => new Map<string, BundledConstitution | Constitution>(cs.map((c) => [c.id, c])))
+      .catch(() => new Map(bundledConstitutions.map((c) => [c.id, c])));
+  }
+  return constitutionsPromise;
+}
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -177,10 +182,11 @@ export async function preloadCorpus(): Promise<void> {
   if (preloadPromise) return preloadPromise;
   preloadPromise = (async () => {
     try {
-      const [allCons, allArticles] = await Promise.all([
-        fetchConstitutions(),
+      const [consById, allArticles] = await Promise.all([
+        constitutionsById(),
         fetchAllArticles(),
       ]);
+      const allCons = Array.from(consById.values());
       if (allArticles.length === 0 || allCons.length === 0) return;
       indexCache = await buildIndexFromAsync(allArticles, allCons, 'supabase');
       console.info(
@@ -200,7 +206,24 @@ export const isCorpusReady = (): boolean => indexCache?.source === 'supabase';
 export const isCorpusLoading = (): boolean =>
   !!preloadPromise && !isCorpusReady();
 
-const isProfileOnlyArticle = (a: BundledArticle | Article): boolean =>
+export async function waitForCorpus(): Promise<void> {
+  if (preloadPromise && !isCorpusReady()) {
+    await preloadPromise.catch(() => {
+    });
+  }
+}
+
+let countryPatterns: Promise<Array<{ pattern: RegExp; id: string }>> | null = null;
+
+export async function mentionedCountryIds(text: string): Promise<string[]> {
+  if (!countryPatterns) {
+    countryPatterns = constitutionsById().then((cs) => buildBoosts(Array.from(cs.values())));
+  }
+  const patterns = await countryPatterns;
+  return Array.from(new Set(patterns.filter((c) => c.pattern.test(text)).map((c) => c.id)));
+}
+
+export const isProfileOnlyArticle = (a: BundledArticle | Article): boolean =>
   typeof a.id === 'string' && a.id.endsWith('-profile');
 
 export function searchCorpus(query: string, k = 4): ScoredArticle[] {
@@ -355,7 +378,7 @@ export function answer(query: string): CitedAnswer {
   };
 }
 
-function retrieveForRAG(query: string, k = 6): ScoredArticle[] {
+export function retrieveForRAG(query: string, k = 6): ScoredArticle[] {
   const top = searchCorpus(query, k);
   const { boosts } = buildIndex();
   const mentioned = boosts.filter((c) => c.pattern.test(query)).map((c) => c.id);
@@ -382,93 +405,5 @@ function retrieveForRAG(query: string, k = 6): ScoredArticle[] {
   return out;
 }
 
-const confidenceFromScore = (score: number): CitedAnswer['confidence'] =>
+export const confidenceFromScore = (score: number): CitedAnswer['confidence'] =>
   score > 0.25 ? 'high' : score > 0.08 ? 'medium' : 'low';
-
-export interface SmartAnswerOptions {
-  query: string;
-  signal?: AbortSignal;
-  onToken?: (token: string) => void;
-  onSources?: (sources: ScoredArticle[]) => void;
-}
-
-export const ragEnabled = (): boolean => isAiConfigured();
-export const ragModelLabel = (): string => aiModel();
-
-export const answerSmart = async (
-  opts: SmartAnswerOptions,
-): Promise<CitedAnswer> => {
-  const { query, signal, onToken, onSources } = opts;
-  const trimmed = query.trim();
-
-  if (!trimmed) {
-    const empty: CitedAnswer = {
-      reply:
-        'Please ask a question about constitutional law and I will cite the most relevant articles I have indexed.',
-      hits: [],
-      confidence: 'low',
-    };
-    onToken?.(empty.reply);
-    return empty;
-  }
-
-  if (preloadPromise && !isCorpusReady()) {
-    await preloadPromise.catch(() => {
-    });
-  }
-
-  const tagProfileOnly = (a: CitedAnswer): CitedAnswer => {
-    const top = a.hits[0];
-    if (top && isProfileOnlyArticle(top.article) && a.hits.length === 1) {
-      return { ...a, degraded: 'profile-only' };
-    }
-    return a;
-  };
-
-  if (isAiConfigured()) {
-    const sources = retrieveForRAG(trimmed, 6);
-    onSources?.(sources);
-
-    if (sources.length === 0) {
-      const fallback = answer(trimmed);
-      onToken?.(fallback.reply);
-      return tagProfileOnly(fallback);
-    }
-
-    let accumulated = '';
-    try {
-      await streamRAG({
-        question: trimmed,
-        sources,
-        signal,
-        onToken: (t) => {
-          accumulated += t;
-          onToken?.(t);
-        },
-      });
-      return tagProfileOnly({
-        reply: accumulated.trim() || answer(trimmed).reply,
-        hits: sources,
-        confidence: confidenceFromScore(sources[0]?.score ?? 0),
-      });
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') {
-        return {
-          reply: accumulated || '_(generation cancelled)_',
-          hits: sources,
-          confidence: confidenceFromScore(sources[0]?.score ?? 0),
-        };
-      }
-      console.warn('[ai] RAG call failed; falling back to local.', err);
-      const fallback = answer(trimmed);
-      onToken?.(fallback.reply);
-      const degraded = (err as Error).name === 'InvalidKeyError' ? 'invalid-key' : 'llm-unavailable';
-      return tagProfileOnly({ ...fallback, degraded });
-    }
-  }
-
-  const local = answer(trimmed);
-  onSources?.(local.hits);
-  onToken?.(local.reply);
-  return tagProfileOnly(local);
-};

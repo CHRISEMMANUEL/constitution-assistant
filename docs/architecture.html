@@ -23,9 +23,9 @@
 <body>
 <main>
 <h1>Constitution Assistant: architecture</h1>
-<p>The current single-call RAG pipeline, and the proposed multi-agent version. Not built yet.</p>
+<p>The original single-call RAG pipeline, and the multi-agent version replacing it. Phase 1 (Planner, Researchers, Writer, chat history) is built. It runs in the browser, because each user brings their own key and the key never leaves the browser.</p>
 
-<h2>Current: one model call, retrieval in the browser</h2>
+<h2>Before: one model call, retrieval in the browser</h2>
 <svg viewBox="0 0 960 430" role="img" aria-label="Current architecture diagram">
   <defs>
     <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2a44"/></marker>
@@ -80,8 +80,8 @@
   <text x="788" y="318" class="lbl">1 call per question</text>
 </svg>
 
-<h2>Proposed: server-side multi-agent pipeline</h2>
-<svg viewBox="0 0 960 640" role="img" aria-label="Proposed multi-agent architecture diagram">
+<h2>Multi-agent pipeline, orchestrated in the browser</h2>
+<svg viewBox="0 0 960 640" role="img" aria-label="Multi-agent architecture diagram">
   <defs>
     <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2a44"/></marker>
     <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8893b"/></marker>
@@ -92,7 +92,7 @@
 
   <rect x="40" y="75" width="210" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
   <text x="52" y="100" class="t">Assistant page</text>
-  <text x="52" y="120" class="s">sends question + history</text>
+  <text x="52" y="120" class="s">question + history</text>
 
   <rect x="40" y="250" width="210" height="80" rx="8" fill="#fff" stroke="#1f2a44"/>
   <text x="52" y="275" class="t">Agent step timeline</text>
@@ -101,15 +101,15 @@
 
   <rect x="40" y="480" width="210" height="80" rx="8" fill="#fff" stroke="#1f2a44" stroke-dasharray="4 3"/>
   <text x="52" y="505" class="t">Local TF-IDF fallback</text>
-  <text x="52" y="525" class="s">offline / function down</text>
+  <text x="52" y="525" class="s">no key / RPC unavailable</text>
   <text x="52" y="542" class="s">(today's ai.ts, kept)</text>
 
   <rect x="310" y="30" width="410" height="580" rx="10" fill="#f7f5f0" stroke="#b8893b" stroke-dasharray="6 4"/>
-  <text x="326" y="54" class="group">SUPABASE EDGE FN · assistant (orchestrator)</text>
+  <text x="326" y="54" class="group">BROWSER · agents.ts (orchestrator)</text>
 
   <rect x="365" y="75" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
   <text x="377" y="100" class="t">1 · Planner</text>
-  <text x="377" y="120" class="s">intent · countries · standalone query</text>
+  <text x="377" y="120" class="s">keyword searches · countries</text>
 
   <rect x="377" y="183" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
   <rect x="371" y="179" width="300" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
@@ -140,9 +140,9 @@
   <line x1="515" y1="435" x2="515" y2="473" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
 
   <line x1="250" y1="105" x2="363" y2="105" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
-  <text x="275" y="97" class="lbl">POST</text>
+  <text x="275" y="97" class="lbl">call</text>
   <path d="M365,505 L290,505 L290,290 L252,290" fill="none" stroke="#b8893b" stroke-width="1.8" marker-end="url(#a3)"/>
-  <text x="198" y="385" class="lbl" transform="rotate(-90 308 385)">SSE: plan · sources · token · verify</text>
+  <text x="198" y="385" class="lbl" transform="rotate(-90 308 385)">stage · sources · tokens</text>
 
   <text x="760" y="54" class="group">DATA &amp; MODELS</text>
   <rect x="750" y="175" width="190" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
@@ -151,9 +151,9 @@
   <line x1="665" y1="205" x2="748" y2="205" stroke="#1f2a44" stroke-width="1.5" marker-start="url(#a2)" marker-end="url(#a2)"/>
 
   <rect x="750" y="320" width="190" height="130" rx="8" fill="#1f2a44"/>
-  <text x="762" y="346" class="t" style="fill:#fff">OpenRouter models</text>
+  <text x="762" y="346" class="t" style="fill:#fff">Your AI provider</text>
   <text x="762" y="368" class="s" style="fill:#d8c39a">user's own key (BYOK)</text>
-  <text x="762" y="388" class="s" style="fill:#d8c39a">prompts fixed on server</text>
+  <text x="762" y="388" class="s" style="fill:#d8c39a">called from the browser</text>
   <text x="762" y="408" class="s" style="fill:#d8c39a">~1 call simple question</text>
   <text x="762" y="428" class="s" style="fill:#d8c39a">~5 calls 3-country compare</text>
 
@@ -165,7 +165,7 @@
 
 <h2>Phases</h2>
 <ol>
-  <li>Search RPC migration + <code>assistant</code> function with Planner, Researchers, Writer (with chat history); client switches over.</li>
+  <li>Done: <code>search_articles</code> RPC migration, and Planner, Researchers and Writer (with chat history) in <code>src/services/agents.ts</code>.</li>
   <li>Per-country Analysts for comparisons + Verifier.</li>
   <li>Tutor/quiz agent + agent step timeline in the UI.</li>
 </ol>

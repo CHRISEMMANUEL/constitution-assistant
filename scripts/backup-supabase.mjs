@@ -40,7 +40,7 @@ async function fetchPage(table, from, attempts = 5) {
         .order('id')
         .range(from, from + PAGE - 1);
       if (error) throw new Error(error.message);
-      return data;
+      return data.map(({ fts, ...row }) => row);
     } catch (e) {
       if (i >= attempts) throw new Error(`${table} @${from}: ${e.message}`);
       await new Promise((r) => setTimeout(r, 1000 * i));

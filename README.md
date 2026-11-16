@@ -27,11 +27,13 @@ The assistant is a research tool, not legal advice.
 
 ## How the assistant works
 
-1. All articles are loaded from Supabase and indexed in the browser (TF-IDF).
-2. For each question, the top matching articles are selected, with at least one per country named in the question.
-3. If the user has saved an API key, the browser sends the articles and the question straight to the chosen provider with that key. The answer streams back.
-4. On OpenRouter, if a free model is rate-limited, the next free model is tried; if all fail, or the key is rejected, the app shows a direct quotation instead.
-5. With no key saved, the app answers from the index alone by quoting the best-matching articles.
+With an API key saved, each question goes through three agents, all run in the browser ([src/services/agents.ts](src/services/agents.ts)), so the key is only ever sent to the chosen provider:
+
+1. **Planner** (one model call): reads the question and the recent conversation and returns up to four keyword searches, each tied to the countries it is about. A comparison gets one search per country, and a follow-up such as "what about Kenya?" is resolved from the earlier turns. If the reply can't be used, the question as typed becomes the search.
+2. **Researchers** (no model call): run the searches in parallel through the `search_articles` Postgres full-text function, then merge the results in turn, up to eight articles. Articles that contain every search term rank first.
+3. **Writer** (one streamed model call): answers from those articles only, cites them as [Source N], and sees the last few turns of the conversation so follow-ups read naturally.
+
+On OpenRouter, if a free model is rate-limited, the next free model is tried. If the key is rejected or the provider fails, the app shows a direct quotation instead. If the search function isn't installed yet, the Researchers use the in-browser TF-IDF index (all articles, loaded from Supabase at startup). With no key saved, the app answers from that index alone by quoting the best-matching articles.
 
 ### Your own AI key
 
@@ -84,6 +86,8 @@ Without Supabase credentials the app runs on the bundled constitutions only.
    - the full corpus: `npm run seed:supabase` (needs `SUPABASE_SERVICE_ROLE_KEY` in `.env`).
 
 Existing databases created before November 2026 also need [supabase/migrations/20261114_source_provenance.sql](supabase/migrations/20261114_source_provenance.sql). It adds source and licence columns, an `articles.active` flag, and changes bookmarks so deleting a bookmarked article is refused instead of silently removing the bookmark. Apply it before deploying a frontend that filters on `active`.
+
+The assistant's search needs [supabase/migrations/20261116_article_search.sql](supabase/migrations/20261116_article_search.sql) (already part of `schema.sql` for new databases). It adds a generated full-text column `articles.fts` (article number and title weighted highest, then chapter, then text), a GIN index, and the `search_articles(query, country_ids, k)` function that anonymous users may call. It returns active articles only, best matches first, at most 50. Until it is applied, the assistant falls back to the in-browser index. The frontend selects article columns by name, so the `fts` column is never downloaded, and `npm run backup:supabase` leaves it out.
 
 Every article row records its `source` (`official`, `constitute`, `wikipedia`, `generated`, `manual`). The seed never replaces a higher-ranked source and never deletes rows; rows it supersedes get `active = false`.
 

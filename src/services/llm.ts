@@ -29,7 +29,7 @@ export const aiModel = (): string => getPreferredModel() || getProvider().defaul
 const SYSTEM_PROMPT = `You are ConstIntell, a constitutional research assistant.
 
 NON-NEGOTIABLE RULES:
-1. Answer the user's question based ONLY on the CONTEXT block in the user message. Do not use outside knowledge of any constitution, statute, case law, or legal commentary. If you find yourself wanting to cite something not in the CONTEXT, you must not.
+1. Answer the user's question based ONLY on the CONTEXT block in the latest user message. Do not use outside knowledge of any constitution, statute, case law, or legal commentary. If you find yourself wanting to cite something not in the CONTEXT, you must not. Earlier turns of the conversation only show what the user is asking about; they are not sources.
 2. If the CONTEXT does not contain enough information to answer, say so plainly using this exact phrasing as your opening line:
    "The provided sources do not contain a direct answer to that."
    Then recommend the most closely related source from the list, naming the country and article.
@@ -51,9 +51,30 @@ const buildContext = (sources: ScoredArticle[]): string =>
 const buildUserMessage = (question: string, sources: ScoredArticle[]): string =>
   `CONTEXT:\n---\n${buildContext(sources)}\n---\n\nQuestion: ${question}\n\nAnswer:`;
 
+export interface ChatTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+type RequestKind = 'answer' | 'plan';
+
+const TOKEN_LIMITS: Record<RequestKind, { chat: number; openai: number; claude: number }> = {
+  answer: { chat: 800, openai: 4000, claude: 8000 },
+  plan: { chat: 600, openai: 2000, claude: 2000 },
+};
+
+interface ChatRequest {
+  kind: RequestKind;
+  system: string;
+  messages: ChatTurn[];
+  signal?: AbortSignal;
+  onToken: (token: string) => void;
+}
+
 export interface RagOptions {
   question: string;
   sources: ScoredArticle[];
+  history?: ChatTurn[];
   signal?: AbortSignal;
   onToken: (token: string) => void;
 }
@@ -75,15 +96,19 @@ function chatHeaders(provider: AiProvider, apiKey: string): Record<string, strin
   return headers;
 }
 
-function chatBody(provider: AiProvider, modelId: string, opts: RagOptions): string {
-  const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: buildUserMessage(opts.question, opts.sources) },
-  ];
+function chatBody(provider: AiProvider, modelId: string, req: ChatRequest): string {
+  const messages = [{ role: 'system', content: req.system }, ...req.messages];
+  const limits = TOKEN_LIMITS[req.kind];
   if (provider.id === 'openai') {
-    return JSON.stringify({ model: modelId, stream: true, max_completion_tokens: 4000, messages });
+    return JSON.stringify({ model: modelId, stream: true, max_completion_tokens: limits.openai, messages });
   }
-  return JSON.stringify({ model: modelId, stream: true, temperature: 0.15, max_tokens: 800, messages });
+  return JSON.stringify({
+    model: modelId,
+    stream: true,
+    temperature: req.kind === 'plan' ? 0 : 0.15,
+    max_tokens: limits.chat,
+    messages,
+  });
 }
 
 async function postWithRetry(
@@ -148,7 +173,7 @@ async function streamChatCompletions(
   provider: AiProvider,
   apiKey: string,
   model: string,
-  opts: RagOptions,
+  opts: ChatRequest,
 ): Promise<void> {
   const candidates = provider.freeModels && model.endsWith(':free')
     ? Array.from(new Set([model, ...OPENROUTER_FALLBACK_MODELS]))
@@ -192,14 +217,14 @@ async function streamChatCompletions(
   throw lastErr ?? new Error(`${provider.name}: all fallback models exhausted`);
 }
 
-async function streamClaude(apiKey: string, model: string, opts: RagOptions): Promise<void> {
+async function streamClaude(apiKey: string, model: string, opts: ChatRequest): Promise<void> {
   const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 1 });
   const params = {
     model,
-    max_tokens: 8000,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user' as const, content: buildUserMessage(opts.question, opts.sources) }],
+    max_tokens: TOKEN_LIMITS[opts.kind].claude,
+    system: opts.system,
+    messages: opts.messages,
     ...(CLAUDE_EFFORT_MODELS.test(model) ? { output_config: { effort: 'low' as const } } : {}),
   };
 
@@ -233,7 +258,7 @@ async function streamClaude(apiKey: string, model: string, opts: RagOptions): Pr
   }
 }
 
-export const streamRAG = async (opts: RagOptions): Promise<void> => {
+async function runChat(req: ChatRequest): Promise<void> {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new InvalidKeyError('No API key saved.');
@@ -242,8 +267,38 @@ export const streamRAG = async (opts: RagOptions): Promise<void> => {
   const provider = getProvider();
   const model = aiModel();
   if (provider.id === 'anthropic') {
-    await streamClaude(apiKey, model, opts);
+    await streamClaude(apiKey, model, req);
     return;
   }
-  await streamChatCompletions(provider, apiKey, model, opts);
+  await streamChatCompletions(provider, apiKey, model, req);
+}
+
+export const streamRAG = (opts: RagOptions): Promise<void> =>
+  runChat({
+    kind: 'answer',
+    system: SYSTEM_PROMPT,
+    messages: [
+      ...(opts.history ?? []),
+      { role: 'user', content: buildUserMessage(opts.question, opts.sources) },
+    ],
+    signal: opts.signal,
+    onToken: opts.onToken,
+  });
+
+export const completeChat = async (
+  system: string,
+  messages: ChatTurn[],
+  signal?: AbortSignal,
+): Promise<string> => {
+  let text = '';
+  await runChat({
+    kind: 'plan',
+    system,
+    messages,
+    signal,
+    onToken: (t) => {
+      text += t;
+    },
+  });
+  return text;
 };

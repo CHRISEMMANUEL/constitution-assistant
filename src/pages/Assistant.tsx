@@ -18,7 +18,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { ApiKeyPanel } from '../components/ApiKeyPanel';
-import { answerSmart, type CitedAnswer } from '../services/ai';
+import type { CitedAnswer } from '../services/ai';
+import { answerSmart, type AgentStage } from '../services/agents';
 import { providerById, useApiKey, usePreferredModel, useProviderId } from '../services/aiKey';
 import { useVoice } from '../lib/useVoice';
 import { useTranslation } from 'react-i18next';
@@ -44,6 +45,12 @@ const confidenceStyles: Record<NonNullable<Message['confidence']>, string> = {
   high: 'text-sage-500 bg-sage-500/10 border-sage-500/30',
   medium: 'text-honey-500 bg-honey-500/10 border-honey-500/30',
   low: 'text-rose-500 bg-rose-500/10 border-rose-500/30',
+};
+
+const stageLabel: Record<AgentStage, string> = {
+  planning: 'assistant.stage_planning',
+  searching: 'assistant.finding_sources',
+  writing: 'assistant.stage_writing',
 };
 
 const degradedNotice: Record<NonNullable<Message['degraded']>, string> = {
@@ -187,6 +194,7 @@ export const Assistant: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [stage, setStage] = useState<AgentStage>('searching');
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
   const [readingWordIndex, setReadingWordIndex] = useState(-1);
@@ -196,6 +204,11 @@ export const Assistant: React.FC = () => {
   const [showKeyPanel, setShowKeyPanel] = useState(() => !apiKey);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef(messages);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const voice = useVoice({
     onTranscript: (transcript, isFinal) => {
@@ -237,6 +250,7 @@ export const Assistant: React.FC = () => {
     if (!text || loading) return;
     voice.stopListening();
 
+    const history = messagesRef.current.map(({ role, content }) => ({ role, content }));
     const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', content: text };
     const aiId = `a-${Date.now()}`;
     setMessages((prev) => [
@@ -247,6 +261,7 @@ export const Assistant: React.FC = () => {
     setInput('');
     setLoading(true);
     setStreaming(true);
+    setStage('searching');
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -254,7 +269,9 @@ export const Assistant: React.FC = () => {
     try {
       const result = await answerSmart({
         query: text,
+        history,
         signal: controller.signal,
+        onStage: setStage,
         onSources: (sources) => {
           setMessages((prev) =>
             prev.map((m) =>
@@ -524,7 +541,7 @@ export const Assistant: React.FC = () => {
                 <div className="bg-paper-soft dark:bg-ink-900/60 border border-slate/15 dark:border-ink-700 rounded-2xl rounded-tl-none p-3 sm:p-4 flex items-center gap-2">
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-iris-500" />
                   <span className="text-slate dark:text-mist text-xs sm:text-sm">
-                    {t('assistant.finding_sources')}
+                    {t(stageLabel[stage])}
                   </span>
                 </div>
               </div>
