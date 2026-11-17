@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  fetchAllArticles,
   fetchArticles,
   fetchConstitutions,
   type Article,
@@ -20,7 +19,6 @@ interface DataContextValue {
   constitutions: Constitution[];
   constitutionsLoading: boolean;
   getArticles: (constitutionId: string) => Promise<Article[]>;
-  getAllArticles: () => Promise<Article[]>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -31,7 +29,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const articlesCache = useRef<Map<string, Article[]>>(new Map());
   const articlesPromise = useRef<Map<string, Promise<Article[]>>>(new Map());
-  const allArticlesPromise = useRef<Promise<Article[]> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,19 +70,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return p;
   }, []);
 
-  const getAllArticles = useCallback(async (): Promise<Article[]> => {
-    if (allArticlesPromise.current) return allArticlesPromise.current;
-    allArticlesPromise.current = fetchAllArticles();
-    return allArticlesPromise.current;
-  }, []);
-
   return (
     <DataContext.Provider
       value={{
         constitutions,
         constitutionsLoading,
         getArticles,
-        getAllArticles,
       }}
     >
       {children}

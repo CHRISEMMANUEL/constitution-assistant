@@ -12,7 +12,7 @@ The app is free and non-commercial: no paid plans, no ads. AI answers use each p
 - **Assistant**: ask questions in plain language. Retrieval finds the most relevant articles, then a language model writes a short answer citing them as `[Source N]`, using your own API key from OpenRouter, OpenAI, Anthropic (Claude), Google Gemini, Groq or xAI (Grok). Without a key, or if no model is reachable, it quotes the best-matching article directly.
 - **Comparisons**: name two or more countries ("compare freedom of expression in Kenya and Ghana") to get evidence from each.
 - **Voice**: speak your question and have answers read aloud (Web Speech API).
-- **Bookmarks**: save articles to your account.
+- **Bookmarks**: save articles to your account. The Bookmarks page fetches only the articles you saved, by id.
 - **Offline**: installable PWA, with a bundled set of 29 constitutions for use without a connection.
 - **Languages**: English, Spanish and French.
 

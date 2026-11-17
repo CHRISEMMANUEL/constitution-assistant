@@ -144,6 +144,33 @@ export const fetchAllArticles = async (): Promise<Article[]> => {
   }
 };
 
+export const fetchArticlesByIds = async (ids: string[]): Promise<Article[]> => {
+  const wanted = new Set(ids);
+  const bundledFor = (missing: Set<string>) =>
+    bundledArticles.filter((a) => missing.has(a.id));
+  if (isPlaceholderEnv || wanted.size === 0) return bundledFor(wanted);
+  // Chunked so the id list never makes the request URL too long.
+  const CHUNK_SIZE = 100;
+  const unique = Array.from(wanted);
+  try {
+    const found: Article[] = [];
+    for (let i = 0; i < unique.length; i += CHUNK_SIZE) {
+      const { data, error } = await supabase
+        .from('articles')
+        .select(ARTICLE_COLUMNS)
+        .in('id', unique.slice(i, i + CHUNK_SIZE))
+        .eq('active', true);
+      if (error) throw error;
+      if (data) found.push(...(data as Article[]));
+    }
+    for (const a of found) wanted.delete(a.id);
+    return [...found, ...bundledFor(wanted)];
+  } catch (err) {
+    console.warn('[api] articles-by-id fetch failed, using bundled.', err);
+    return bundledFor(wanted);
+  }
+};
+
 export interface ArticleSearchHit extends Article {
   rank: number;
   matched_all: boolean;

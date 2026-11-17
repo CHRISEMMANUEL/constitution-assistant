@@ -1,32 +1,43 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bookmark, ChevronRight, Loader2, Trash2 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useBookmarks } from '../lib/useBookmarks';
-import { type Article, type Constitution } from '../services/api';
+import { fetchArticlesByIds, type Article, type Constitution } from '../services/api';
 import { regionLabel, regionColorClass } from '../data/constitutions';
 import { useData } from '../context/DataContext';
 
 export const Bookmarks: React.FC = () => {
   const { items, remove } = useBookmarks();
-  const { constitutions, constitutionsLoading, getAllArticles } = useData();
+  const { constitutions, constitutionsLoading } = useData();
   const [articles, setArticles] = useState<Article[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(true);
+  const requested = useRef<Set<string>>(new Set());
 
   const loading = constitutionsLoading || articlesLoading;
 
+  // Fetch only bookmarked articles, and only ones not already requested,
+  // so removing a bookmark doesn't refetch the rest.
   useEffect(() => {
+    const missing = items
+      .map((b) => b.article_id)
+      .filter((id) => !requested.current.has(id));
+    if (missing.length === 0) {
+      setArticlesLoading(false);
+      return;
+    }
     let cancelled = false;
-    getAllArticles().then((all) => {
+    fetchArticlesByIds(missing).then((rows) => {
       if (cancelled) return;
-      setArticles(all);
+      for (const id of missing) requested.current.add(id);
+      setArticles((prev) => [...prev, ...rows]);
       setArticlesLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [getAllArticles]);
+  }, [items]);
 
   const articlesById = useMemo(() => {
     const m = new Map<string, Article>();
