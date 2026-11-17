@@ -182,3 +182,106 @@ export async function buildQuiz(opts: QuizOptions): Promise<Quiz> {
     throw err;
   }
 }
+
+const CLOZE_COMMON = new Set([
+  'shall', 'which', 'their', 'there', 'these', 'those', 'other', 'under', 'where', 'after', 'before',
+  'being', 'every', 'within', 'without', 'about', 'provided', 'subject', 'accordance', 'section',
+  'sections', 'article', 'articles', 'chapter', 'paragraph', 'subsection', 'constitution', 'including',
+  'whether', 'unless', 'except', 'having', 'until', 'against', 'between', 'during', 'through', 'would',
+  'could', 'should', 'might', 'whose', 'thereof', 'herein', 'hereby', 'otherwise', 'further', 'manner',
+  'concerning', 'relating', 'regarding', 'respect', 'applicable', 'following', 'therefore', 'provision',
+  'provisions', 'matters', 'repealed',
+]);
+
+const BLANK = '_____';
+const MAX_PASSAGE_WORDS = 40;
+
+const contentWords = (text: string, minLength = 5): string[] =>
+  (text.toLowerCase().match(new RegExp(`[a-z]{${minLength},}`, 'g')) ?? []).filter((w) => !CLOZE_COMMON.has(w));
+
+const sentencesOf = (text: string): string[] =>
+  text
+    .replace(/\s+/g, ' ')
+    .split(/(?<=[.;:])\s+(?=[A-Z(“"])/)
+    .map((s) => s.trim())
+    .filter((s) => {
+      const words = s.split(' ').length;
+      return words >= 8 && words <= 80 && !/\brepealed\b/i.test(s);
+    });
+
+function blankOut(sentence: string, word: string): string | null {
+  const words = sentence.split(' ');
+  const matches = (w: string) => w.toLowerCase().replace(/[^a-z]/g, '') === word;
+  const at = words.findIndex(matches);
+  if (at === -1) return null;
+  const cut = words.map((w) => (matches(w) ? w.replace(/[A-Za-z]+/, BLANK) : w));
+  const start = Math.max(0, Math.min(at - MAX_PASSAGE_WORDS / 2, cut.length - MAX_PASSAGE_WORDS));
+  const end = Math.min(cut.length, start + MAX_PASSAGE_WORDS);
+  return `${start > 0 ? '…' : ''}${cut.slice(start, end).join(' ')}${end < cut.length ? '…' : ''}`;
+}
+
+// Without a key there is no model, so code writes fill-in-the-blank questions from the cited text:
+// one key word is blanked and the wrong options are other words from the same sources.
+export function buildClozeQuiz(topic: string, sources: ScoredArticle[]): Quiz {
+  const usable = sources.filter((s) => !s.article.id.endsWith('-profile'));
+  const countryWords = usable.flatMap((s) => contentWords(s.constitution.country, 4));
+  const blankable = (w: string) => !countryWords.some((c) => w.startsWith(c));
+  const topicWords = new Set(contentWords(topic, 4).filter(blankable));
+  const wordsOf = (text: string) =>
+    [...contentWords(text), ...contentWords(text, 4).filter((w) => w.length === 4 && topicWords.has(w))].filter(blankable);
+
+  const frequency = new Map<string, number>();
+  for (const s of usable) {
+    for (const w of wordsOf(s.article.content)) frequency.set(w, (frequency.get(w) ?? 0) + 1);
+  }
+  const vocabulary = [...frequency.keys()];
+
+  const candidates = usable.map((s, i) =>
+    sentencesOf(s.article.content).flatMap((sentence) => {
+      const inSentence = new Set(wordsOf(sentence));
+      const answer = [...inSentence].sort(
+        (a, b) =>
+          Number(topicWords.has(b)) - Number(topicWords.has(a)) ||
+          (frequency.get(a) ?? 0) - (frequency.get(b) ?? 0) ||
+          b.length - a.length,
+      )[0];
+      if (!answer) return [];
+      const distractors = vocabulary
+        .filter((w) => !inSentence.has(w) && Math.abs(w.length - answer.length) <= 3)
+        .sort((a, b) => (frequency.get(b) ?? 0) - (frequency.get(a) ?? 0))
+        .slice(0, OPTIONS - 1);
+      const passage = blankOut(sentence, answer);
+      if (!passage || distractors.length < OPTIONS - 1) return [];
+      return [{
+        question: `${s.constitution.flag} ${s.article.article_number}: “${passage}”`,
+        options: [answer, ...distractors],
+        answer: 0,
+        explanation: `${s.constitution.country}, ${s.article.article_number}`,
+        source: i + 1,
+        quote: sentence,
+        onTopic: topicWords.has(answer),
+      }];
+    }),
+  );
+
+  const questions: QuizQuestion[] = [];
+  const usedAnswers = new Set<string>();
+  let added = true;
+  while (added && questions.length < MAX_QUESTIONS) {
+    added = false;
+    for (const list of candidates) {
+      if (questions.length >= MAX_QUESTIONS) break;
+      const fresh = (c: (typeof list)[number]) => !usedAnswers.has(c.options[0]);
+      const onTopic = list.findIndex((c) => c.onTopic && fresh(c));
+      const at = onTopic !== -1 ? onTopic : list.findIndex(fresh);
+      if (at === -1) continue;
+      const [{ onTopic: _onTopic, ...question }] = list.splice(at, 1);
+      usedAnswers.add(question.options[0]);
+      questions.push(question);
+      added = true;
+    }
+  }
+
+  if (questions.length === 0) throw new NoQuizError();
+  return { topic, questions: questions.map(shuffle), sources };
+}

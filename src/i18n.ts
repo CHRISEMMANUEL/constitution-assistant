@@ -113,6 +113,7 @@ const resources = {
       tutor: {
         button: "Quiz me",
         button_title: "Practice questions written from this answer's sources",
+        button_title_cloze: "Fill-in-the-blank questions from this answer's sources, no key needed",
         stage_drafting: "Writing practice questions from the sources…",
         stage_checking: "Checking each question against its source…",
         heading: "Practice questions: {{topic}}",
@@ -301,6 +302,7 @@ const resources = {
       tutor: {
         button: "Ponme a prueba",
         button_title: "Preguntas de práctica escritas a partir de las fuentes de esta respuesta",
+        button_title_cloze: "Preguntas para completar a partir de las fuentes de esta respuesta, sin clave",
         stage_drafting: "Escribiendo preguntas de práctica a partir de las fuentes…",
         stage_checking: "Comprobando cada pregunta con su fuente…",
         heading: "Preguntas de práctica: {{topic}}",
@@ -489,6 +491,7 @@ const resources = {
       tutor: {
         button: "Quiz",
         button_title: "Questions d’entraînement rédigées à partir des sources de cette réponse",
+        button_title_cloze: "Textes à trous tirés des sources de cette réponse, sans clé",
         stage_drafting: "Rédaction de questions d’entraînement à partir des sources…",
         stage_checking: "Vérification de chaque question dans sa source…",
         heading: "Questions d’entraînement : {{topic}}",

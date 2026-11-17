@@ -168,7 +168,7 @@
 <ol>
   <li>Done: <code>search_articles</code> RPC migration, and Planner, Researchers and Writer (with chat history) in <code>src/services/agents.ts</code>.</li>
   <li>Done: per-country Analysts for comparisons (<code>agents.ts</code>) and the code Verifier (<code>src/services/verifier.ts</code>) with one repair.</li>
-  <li>Done: agent step timeline (<code>src/services/trace.ts</code>, <code>src/components/AgentTimeline.tsx</code>) and the Tutor (<code>src/services/tutor.ts</code>, <code>src/components/QuizCard.tsx</code>): 3 to 5 multiple-choice questions from one answer's sources, each checked in code (options, answer index, source number, verbatim quote), one rewrite when fewer than three pass, options shuffled in code.</li>
+  <li>Done: agent step timeline (<code>src/services/trace.ts</code>, <code>src/components/AgentTimeline.tsx</code>) and the Tutor (<code>src/services/tutor.ts</code>, <code>src/components/QuizCard.tsx</code>): 3 to 5 multiple-choice questions from one answer's sources, each checked in code (options, answer index, source number, verbatim quote), one rewrite when fewer than three pass, options shuffled in code. Without a key, <code>buildClozeQuiz</code> writes fill-in-the-blank questions in code from the same sources.</li>
 </ol>
 </main>
 </body>

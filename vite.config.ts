@@ -34,14 +34,6 @@ export default defineConfig({
         globIgnores: ['**/assets/sdk-*.js'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/restcountries\.com\//,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'rest-countries-v1',
-              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 7 },
-            },
-          },
-          {
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\//,
             handler: 'StaleWhileRevalidate',
             options: {

@@ -9,14 +9,10 @@ import {
   Globe,
   ChevronRight,
 } from 'lucide-react';
-import { type Article, type Constitution } from '../services/api';
+import { subscribeCatalogueFailed, type Article, type Constitution } from '../services/api';
 import { regionLabel, regionColorClass, type Region } from '../data/constitutions';
 import { ContinentSelector } from '../components/ContinentSelector';
 import { CountryDropdown } from '../components/CountryDropdown';
-import {
-  subscribeCountriesStatus,
-  type CountriesStatus,
-} from '../services/countries';
 import { BookmarkButton } from '../components/BookmarkButton';
 import { useTrackVisit } from '../lib/useBookmarks';
 import { useData } from '../context/DataContext';
@@ -146,15 +142,13 @@ export const Explorer: React.FC = () => {
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [continent, setContinent] = useState<Region | 'all'>('all');
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
-  const [countryStatus, setCountryStatus] = useState<CountriesStatus>({
-    state: 'idle',
-  });
+  const [catalogueFailed, setCatalogueFailed] = useState(false);
   const { t } = useTranslation();
 
   const loading = constitutionsLoading || articlesLoading;
 
   useEffect(() => {
-    const unsub = subscribeCountriesStatus(setCountryStatus);
+    const unsub = subscribeCatalogueFailed(setCatalogueFailed);
     return () => {
       unsub();
     };
@@ -231,7 +225,7 @@ export const Explorer: React.FC = () => {
             </div>
           </div>
 
-          {countryStatus.state === 'error' && (
+          {catalogueFailed && (
             <p className="text-[11px] text-rose-500">
               ● {t('explorer.error_catalogue')}
             </p>

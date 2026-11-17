@@ -22,7 +22,7 @@ import { AgentTimeline } from '../components/AgentTimeline';
 import { QuizCard } from '../components/QuizCard';
 import { type CitedAnswer } from '../services/ai';
 import { answerSmart } from '../services/agents';
-import { buildQuiz, type Quiz } from '../services/tutor';
+import { buildClozeQuiz, buildQuiz, type Quiz } from '../services/tutor';
 import type { AgentStep } from '../services/trace';
 import { providerById, useApiKey, usePreferredModel, useProviderId } from '../services/aiKey';
 import { useVoice } from '../lib/useVoice';
@@ -346,6 +346,7 @@ export const Assistant: React.FC = () => {
   };
 
   // The tutor quizzes the student on the sources of one answer, asked about the question before it.
+  // Without a key the questions are fill-in-the-blank, written by code from the same sources.
   const startQuiz = async (answerMsg: Message) => {
     const sources = answerMsg.citations;
     if (loading || !sources?.length) return;
@@ -357,6 +358,16 @@ export const Assistant: React.FC = () => {
         .find((m) => m.role === 'user')?.content ?? '';
 
     const quizId = `q-${Date.now()}`;
+    if (!apiKey) {
+      let message: Message = { id: quizId, role: 'assistant', kind: 'quiz', content: '' };
+      try {
+        message = { ...message, quiz: buildClozeQuiz(topic, sources) };
+      } catch {
+        message = { ...message, content: t('tutor.failed') };
+      }
+      setMessages((prev) => [...prev, message]);
+      return;
+    }
     const update = (patch: Partial<Message>) =>
       setMessages((prev) => prev.map((m) => (m.id === quizId ? { ...m, ...patch } : m)));
     setMessages((prev) => [...prev, { id: quizId, role: 'assistant', kind: 'quiz', content: '' }]);
@@ -457,18 +468,21 @@ export const Assistant: React.FC = () => {
 
       {showKeyPanel ? (
         <ApiKeyPanel onClose={() => setShowKeyPanel(false)} />
+      ) : apiKey ? (
+        <div className="mb-3 sm:mb-4 flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-sage-500/40 bg-sage-500/10 text-sage-500 min-w-0">
+          <KeyRound className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">{t('assistant.key_on', { model: aiModel, provider: aiProvider.name })}</span>
+        </div>
       ) : (
-        !apiKey && (
-          <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-honey-500/40 bg-honey-500/10 text-honey-700 dark:text-honey-100">
-            <span>{t('assistant.key_missing')}</span>
-            <button
-              onClick={() => setShowKeyPanel(true)}
-              className="font-medium underline underline-offset-2 hover:text-iris-500"
-            >
-              {t('assistant.key_add')}
-            </button>
-          </div>
-        )
+        <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-honey-500/40 bg-honey-500/10 text-honey-700 dark:text-honey-100">
+          <span>{t('assistant.key_missing')}</span>
+          <button
+            onClick={() => setShowKeyPanel(true)}
+            className="font-medium underline underline-offset-2 hover:text-iris-500"
+          >
+            {t('assistant.key_add')}
+          </button>
+        </div>
       )}
 
       {messages.length <= 1 && (
@@ -576,11 +590,11 @@ export const Assistant: React.FC = () => {
                       </span>
                     ))}
                     <div className="ml-auto flex items-center gap-2">
-                    {apiKey && !loading && !!msg.citations?.length && (
+                    {!loading && !!msg.citations?.length && (
                       <button
                         onClick={() => startQuiz(msg)}
                         className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-slate/25 dark:border-ink-700 text-slate dark:text-mist hover:border-iris-500 hover:text-iris-500 transition-colors"
-                        title={t('tutor.button_title')}
+                        title={t(apiKey ? 'tutor.button_title' : 'tutor.button_title_cloze')}
                       >
                         <GraduationCap className="w-3 h-3" /> {t('tutor.button')}
                       </button>

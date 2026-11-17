@@ -6,7 +6,6 @@ import {
   type BundledConstitution,
   type Region,
 } from '../data/constitutions';
-import { fetchAllCountries, type CountryProfile } from './countries';
 
 export interface Constitution extends BundledConstitution {
   indexed?: boolean;
@@ -29,48 +28,26 @@ const isPlaceholderEnv = !import.meta.env.VITE_SUPABASE_URL;
 
 const ARTICLE_COLUMNS = 'id,constitution_id,chapter,article_number,title,content,ord,source,active,created_at';
 
-const profileToConstitution = (p: CountryProfile): Constitution => ({
-  id: p.id,
-  country: p.country,
-  country_code: p.country_code,
-  flag: p.flag,
-  flag_image_url: p.flag_image_url,
-  region: p.region,
-  subregion: p.subregion,
-  capital: p.capital,
-  population: p.population,
-  languages: p.languages,
-  title: '',
-  adopted: '',
-  summary: '',
-  indexed: false,
-});
+let catalogueFailed = false;
+const catalogueListeners = new Set<(failed: boolean) => void>();
 
-export const fetchConstitutions = async (): Promise<Constitution[]> => {
+export const subscribeCatalogueFailed = (fn: (failed: boolean) => void) => {
+  catalogueListeners.add(fn);
+  fn(catalogueFailed);
+  return () => {
+    catalogueListeners.delete(fn);
+  };
+};
+
+const setCatalogueFailed = (failed: boolean) => {
+  catalogueFailed = failed;
+  catalogueListeners.forEach((l) => l(failed));
+};
+
+const loadConstitutions = async (): Promise<Constitution[]> => {
   const byId = new Map<string, Constitution>(
     bundledConstitutions.map((c) => [c.id, { ...c, indexed: true }]),
   );
-
-  try {
-    const profiles = await fetchAllCountries();
-    for (const p of profiles) {
-      const existing = byId.get(p.id);
-      if (existing) {
-        byId.set(p.id, {
-          ...existing,
-          flag_image_url: p.flag_image_url,
-          capital: p.capital,
-          population: p.population,
-          languages: p.languages,
-          subregion: p.subregion,
-        });
-      } else {
-        byId.set(p.id, profileToConstitution(p));
-      }
-    }
-  } catch (err) {
-    console.warn('[api] REST Countries fetch failed, continuing without it.', err);
-  }
 
   if (!isPlaceholderEnv) {
     try {
@@ -82,8 +59,10 @@ export const fetchConstitutions = async (): Promise<Constitution[]> => {
           byId.set(row.id, { ...existing, ...row, indexed: true });
         }
       }
+      setCatalogueFailed(false);
     } catch (err) {
-      console.warn('[api] Supabase constitutions fetch failed; using merged bundled + REST.', err);
+      console.warn('[api] Supabase constitutions fetch failed; using the bundled countries.', err);
+      setCatalogueFailed(true);
     }
   }
 
@@ -91,6 +70,18 @@ export const fetchConstitutions = async (): Promise<Constitution[]> => {
     if (!!a.indexed !== !!b.indexed) return a.indexed ? -1 : 1;
     return a.country.localeCompare(b.country);
   });
+};
+
+let constitutionsLoad: Promise<Constitution[]> | null = null;
+
+export const fetchConstitutions = (): Promise<Constitution[]> => {
+  if (!constitutionsLoad) {
+    constitutionsLoad = loadConstitutions().then((cs) => {
+      if (catalogueFailed) constitutionsLoad = null;
+      return cs;
+    });
+  }
+  return constitutionsLoad;
 };
 
 export const fetchArticles = async (
@@ -176,20 +167,45 @@ export interface ArticleSearchHit extends Article {
   matched_all: boolean;
 }
 
-export const searchArticles = async (
+const runSearch = async (
   query: string,
   countryIds: string[],
   k: number,
 ): Promise<ArticleSearchHit[] | null> => {
-  if (isPlaceholderEnv) return null;
-  const { data, error } = await supabase.rpc('search_articles', {
-    query,
-    country_ids: countryIds.length ? countryIds : null,
-    k,
-  });
-  if (error) {
-    console.warn('[api] search_articles failed, using the in-browser index.', error);
-    return null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const { data, error } = await supabase.rpc('search_articles', {
+      query,
+      country_ids: countryIds.length ? countryIds : null,
+      k,
+    });
+    if (!error) return (data ?? []) as ArticleSearchHit[];
+    console.warn(
+      attempt === 1
+        ? '[api] search_articles failed, retrying once.'
+        : '[api] search_articles failed, using the in-browser index.',
+      error,
+    );
   }
-  return (data ?? []) as ArticleSearchHit[];
+  return null;
+};
+
+const searchCache = new Map<string, Promise<ArticleSearchHit[] | null>>();
+
+// One retry before giving up, since the fallback downloads the whole corpus. Results are kept for
+// the session, so asking again or quizzing on an answer does not repeat the search.
+export const searchArticles = (
+  query: string,
+  countryIds: string[],
+  k: number,
+): Promise<ArticleSearchHit[] | null> => {
+  if (isPlaceholderEnv) return Promise.resolve(null);
+  const key = JSON.stringify([query, [...countryIds].sort(), k]);
+  const cached = searchCache.get(key);
+  if (cached) return cached;
+  const pending = runSearch(query, countryIds, k);
+  searchCache.set(key, pending);
+  pending.then((hits) => {
+    if (hits === null) searchCache.delete(key);
+  });
+  return pending;
 };

@@ -2,10 +2,11 @@ import type { ScoredArticle } from './ai';
 import { getApiKey, getPreferredModel, getProvider, type AiProvider } from './aiKey';
 
 const OPENROUTER_FALLBACK_MODELS = [
-  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
   'google/gemma-4-26b-a4b-it:free',
-  'nvidia/nemotron-3-super-120b-a12b:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
+  'nvidia/nemotron-3.5-super-vl:free',
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
+  'nvidia/nemotron-3.5-lightning:free',
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
 ];
 
 const CLAUDE_SERVER_FALLBACK_MODELS = new Set([
@@ -67,7 +68,7 @@ const TOKEN_LIMITS: Record<RequestKind, { chat: number; openai: number; claude: 
   answer: { chat: 800, openai: 4000, claude: 8000 },
   plan: { chat: 600, openai: 2000, claude: 2000 },
   analyze: { chat: 500, openai: 2000, claude: 2000 },
-  tutor: { chat: 1500, openai: 4000, claude: 4000 },
+  tutor: { chat: 2500, openai: 4000, claude: 4000 },
 };
 
 const TEMPERATURE: Record<RequestKind, number> = { answer: 0.15, plan: 0, analyze: 0.15, tutor: 0.4 };
@@ -107,7 +108,7 @@ function chatHeaders(provider: AiProvider, apiKey: string): Record<string, strin
   return headers;
 }
 
-function chatBody(provider: AiProvider, modelId: string, req: ChatRequest): string {
+function chatBody(provider: AiProvider, modelId: string, req: ChatRequest, noReasoning: boolean): string {
   const messages = [{ role: 'system', content: req.system }, ...req.messages];
   const limits = TOKEN_LIMITS[req.kind];
   if (provider.id === 'openai') {
@@ -119,6 +120,7 @@ function chatBody(provider: AiProvider, modelId: string, req: ChatRequest): stri
     temperature: TEMPERATURE[req.kind],
     max_tokens: limits.chat,
     messages,
+    ...(noReasoning ? { reasoning: { enabled: false } } : {}),
   });
 }
 
@@ -191,20 +193,22 @@ async function streamChatCompletions(
     : [model];
   const headers = chatHeaders(provider, apiKey);
 
+  // Thinking models spend max_tokens on hidden reasoning before replying, which left free models
+  // sending nothing, so OpenRouter is asked to skip it unless the model insists.
   let lastErr: unknown;
   for (let i = 0; i < candidates.length; i++) {
     const m = candidates[i];
+    const hasNext = i < candidates.length - 1;
+    let tokens = 0;
+    let noReasoning = provider.id === 'openrouter';
     try {
-      const res = await postWithRetry(provider.chatUrl, headers, chatBody(provider, m, opts), opts.signal);
-
-      if (res.status === 429) {
-        const detail = await res.text().catch(() => '');
-        lastErr = new Error(`${provider.name} 429 on ${m} — ${detail.slice(0, 200)}`);
-        if (i < candidates.length - 1) {
-          console.info(`[llm] ${m} rate-limited; trying next model.`);
-          continue;
+      let res = await postWithRetry(provider.chatUrl, headers, chatBody(provider, m, opts, noReasoning), opts.signal);
+      if (res.status === 400 && noReasoning) {
+        const detail = await res.clone().text().catch(() => '');
+        if (/reasoning/i.test(detail)) {
+          noReasoning = false;
+          res = await postWithRetry(provider.chatUrl, headers, chatBody(provider, m, opts, false), opts.signal);
         }
-        throw lastErr;
       }
 
       if (!res.ok) {
@@ -215,14 +219,17 @@ async function streamChatCompletions(
         throw new Error(`${provider.name} ${res.status} on ${m} — ${detail.slice(0, 240)}`);
       }
 
-      await streamFromResponse(res, opts.onToken);
-      return;
+      await streamFromResponse(res, (t) => {
+        tokens++;
+        opts.onToken(t);
+      });
+      if (tokens > 0) return;
+      throw new Error(`${provider.name}: ${m} sent an empty reply`);
     } catch (err) {
       const e = err as Error;
-      if (e.name === 'AbortError') throw err;
+      if (e.name === 'AbortError' || e.name === 'InvalidKeyError' || tokens > 0 || !hasNext) throw err;
       lastErr = err;
-      const msg = e.message || '';
-      if (!msg.includes('429')) throw err;
+      console.info(`[llm] ${m} failed; trying next model.`, e.message);
     }
   }
   throw lastErr ?? new Error(`${provider.name}: all fallback models exhausted`);
