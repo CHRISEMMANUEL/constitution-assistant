@@ -122,6 +122,8 @@ The GitHub Actions workflow [.github/workflows/seed.yml](.github/workflows/seed.
 
 The frontend is a static build (`npm run build`, output in `dist/`) deployed on Netlify. `public/_redirects` routes all paths to `index.html` for client-side routing.
 
+The scale logo in `public/favicon.svg` is the source for every icon. `favicon.ico` (16/32/48), `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` and `icon-maskable-512.png` are drawn from it. `og-image.png` (1200×630) is the link-preview card that `index.html` sets as `og:image` and `twitter:image`, alongside the schema.org `WebApplication` data. The service worker leaves the card out of its precache. If the logo changes, re-render all of these files.
+
 ## Data sources and attribution
 
 - **Official constitution texts**: for the countries marked `ready` in [scripts/sources.json](scripts/sources.json), taken from official publications (for example the U.S. National Archives, India's Legislative Department, South Africa's Department of Justice and Constitutional Development, and official prints transcribed on [Wikisource](https://en.wikisource.org)). Each country page in the Explorer shows its source and licence.

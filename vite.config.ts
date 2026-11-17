@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'robots.txt'],
+      includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'robots.txt'],
       manifest: {
         name: "Constitution Assistant — The World's Constitutions",
         short_name: 'Constitution',
@@ -31,7 +31,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        globIgnores: ['**/assets/sdk-*.js'],
+        globIgnores: ['**/assets/sdk-*.js', 'og-image.png'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\//,
