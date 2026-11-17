@@ -1,8 +1,10 @@
 import { searchArticles, type ArticleSearchHit } from './api';
 import {
   answer,
+  answerFromDatabase,
   confidenceFromScore,
   constitutionsById,
+  fromDatabaseHits,
   isProfileOnlyArticle,
   mentionedCountryIds,
   searchCorpus,
@@ -164,13 +166,7 @@ async function research(searches: PlannedSearch[]): Promise<Findings> {
   );
 
   if (remote.every((hits): hits is ArticleSearchHit[] => hits !== null)) {
-    const byId = await constitutionsById();
-    const lists = remote.map((hits) =>
-      hits.flatMap(({ rank, matched_all, ...article }) => {
-        const constitution = byId.get(article.constitution_id);
-        return constitution ? [{ article, constitution, score: rank + (matched_all ? 1 : 0) }] : [];
-      }),
-    );
+    const lists = await Promise.all(remote.map(fromDatabaseHits));
     const answered = lists.filter((l) => l.length > 0);
     const exact = answered.filter((l) => l[0].score >= 1).length;
     const confidence: CitedAnswer['confidence'] =
@@ -313,6 +309,8 @@ async function verifyAndRepair(
 }
 
 async function localAnswer(query: string): Promise<CitedAnswer> {
+  const fromDatabase = await answerFromDatabase(query);
+  if (fromDatabase) return fromDatabase;
   await waitForCorpus();
   return answer(query);
 }

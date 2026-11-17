@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { ApiKeyPanel } from '../components/ApiKeyPanel';
-import { preloadCorpus, type CitedAnswer } from '../services/ai';
+import { type CitedAnswer } from '../services/ai';
 import { answerSmart, type AgentStage } from '../services/agents';
 import { providerById, useApiKey, usePreferredModel, useProviderId } from '../services/aiKey';
 import { useVoice } from '../lib/useVoice';
@@ -212,11 +212,6 @@ export const Assistant: React.FC = () => {
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
-
-  // Without a key every answer is searched in the browser, so start the download now.
-  useEffect(() => {
-    if (!apiKey) preloadCorpus();
-  }, [apiKey]);
 
   const voice = useVoice({
     onTranscript: (transcript, isFinal) => {

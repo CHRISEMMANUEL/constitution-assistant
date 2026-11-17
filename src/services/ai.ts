@@ -7,7 +7,9 @@ import {
 import {
   fetchAllArticles,
   fetchConstitutions,
+  searchArticles,
   type Article,
+  type ArticleSearchHit,
   type Constitution,
 } from './api';
 
@@ -78,13 +80,15 @@ function buildBoosts(
   const out: Array<{ pattern: RegExp; id: string }> = [];
   for (const c of cs) {
     if (!c.country) continue;
+    // The optional suffix catches demonyms such as Nigerian, Kenyan, Ghanaian and Japanese.
     out.push({
-      pattern: new RegExp(`\\b${escapeRegex(c.country)}\\b`, 'i'),
+      pattern: new RegExp(`\\b(${escapeRegex(c.country)})(?:n|an|ian|ese)?s?\\b`, 'i'),
       id: c.id,
     });
   }
   const aliases: Array<[RegExp, string]> = [
     [/\b(united states|usa|u\.s\.|america|american)\b/i, 'us'],
+    [/\bU\.?S\.?A?\b/, 'us'],
     [/\bbritain|british|uk\b/i, 'gb'],
     [/\b(czech republic|czechia)\b/i, 'cz'],
     [/\bholland\b/i, 'nl'],
@@ -93,6 +97,29 @@ function buildBoosts(
   ];
   for (const [pattern, id] of aliases) out.push({ pattern, id });
   return out;
+}
+
+const globally = (pattern: RegExp): RegExp =>
+  new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+
+// Longest match wins, so "South Sudan" is not also Sudan. On a tie the longer country name wins,
+// so "Nigerian" is Nigeria + "n" rather than Niger + "ian".
+function countriesIn(text: string, boosts: Array<{ pattern: RegExp; id: string }>): string[] {
+  const found = boosts.flatMap(({ pattern, id }) =>
+    [...text.matchAll(globally(pattern))].map((m) => ({
+      id,
+      start: m.index,
+      end: m.index + m[0].length,
+      name: (m[1] ?? m[0]).length,
+    })),
+  );
+  type Match = (typeof found)[number];
+  const beats = (b: Match, a: Match) =>
+    b.start <= a.start &&
+    b.end >= a.end &&
+    (b.end - b.start > a.end - a.start || (b.end - b.start === a.end - a.start && b.name > a.name));
+  const kept = found.filter((a) => !found.some((b) => beats(b, a)));
+  return [...new Set(kept.sort((a, b) => a.start - b.start).map((m) => m.id))];
 }
 
 function buildIndexFrom(
@@ -214,12 +241,15 @@ export async function waitForCorpus(): Promise<void> {
 
 let countryPatterns: Promise<Array<{ pattern: RegExp; id: string }>> | null = null;
 
-export async function mentionedCountryIds(text: string): Promise<string[]> {
+function countryBoosts(): Promise<Array<{ pattern: RegExp; id: string }>> {
   if (!countryPatterns) {
     countryPatterns = constitutionsById().then((cs) => buildBoosts(Array.from(cs.values())));
   }
-  const patterns = await countryPatterns;
-  return Array.from(new Set(patterns.filter((c) => c.pattern.test(text)).map((c) => c.id)));
+  return countryPatterns;
+}
+
+export async function mentionedCountryIds(text: string): Promise<string[]> {
+  return countriesIn(text, await countryBoosts());
 }
 
 export const isProfileOnlyArticle = (a: BundledArticle | Article): boolean =>
@@ -230,7 +260,7 @@ export function searchCorpus(query: string, k = 4): ScoredArticle[] {
   const qTokens = tokenize(query);
   if (qTokens.length === 0) return [];
 
-  const targetCountry = boosts.find((c) => c.pattern.test(query))?.id;
+  const targetCountry = countriesIn(query, boosts)[0];
 
   const scored: ScoredArticle[] = entries.map((e) => {
     let score = 0;
@@ -272,7 +302,7 @@ const COMPARE_TRIGGER = /\b(compare|vs|versus|difference|differ)\b/i;
 function compareAcrossCountries(query: string): CitedAnswer | null {
   if (!COMPARE_TRIGGER.test(query)) return null;
   const { entries, idf, boosts } = buildIndex();
-  const mentioned = boosts.filter((c) => c.pattern.test(query)).map((c) => c.id);
+  const mentioned = countriesIn(query, boosts);
   if (mentioned.length < 2) return null;
   const qTokens = tokenize(query);
 
@@ -303,8 +333,10 @@ function compareAcrossCountries(query: string): CitedAnswer | null {
     }
   }
 
-  if (perCountry.length < 2) return null;
+  return perCountry.length < 2 ? null : compareReply(query, perCountry);
+}
 
+function compareReply(query: string, perCountry: ScoredArticle[]): CitedAnswer {
   const intro = `Here is a side-by-side comparison drawn directly from each constitution:`;
   const blocks = perCountry
     .map(
@@ -320,15 +352,21 @@ function compareAcrossCountries(query: string): CitedAnswer | null {
   };
 }
 
+const EMPTY_QUESTION: CitedAnswer = {
+  reply: 'Please ask a question about constitutional law and I will cite the most relevant articles I have indexed.',
+  hits: [],
+  confidence: 'low',
+};
+
+const noMatchReply = (sizeNote: string): CitedAnswer => ({
+  reply: `I couldn't find a passage that clearly matches that question. ${sizeNote} Try rephrasing — e.g. mention the country by name ("freedom of expression in Kenya"), the right itself ("right to a fair trial"), or ask me to compare two countries.`,
+  hits: [],
+  confidence: 'low',
+});
+
 export function answer(query: string): CitedAnswer {
   const trimmed = query.trim();
-  if (!trimmed) {
-    return {
-      reply: 'Please ask a question about constitutional law and I will cite the most relevant articles I have indexed.',
-      hits: [],
-      confidence: 'low',
-    };
-  }
+  if (!trimmed) return EMPTY_QUESTION;
 
   const cmp = compareAcrossCountries(trimmed);
   if (cmp) return cmp;
@@ -336,21 +374,22 @@ export function answer(query: string): CitedAnswer {
   const hits = searchCorpus(trimmed, 4);
   if (hits.length === 0) {
     const { entries, source } = buildIndex();
-    const sizeNote =
+    return noMatchReply(
       source === 'supabase'
         ? `My corpus indexes ${entries.length} articles across every country with available text.`
-        : `My corpus is still loading; only the offline bundle is ready right now.`;
-    return {
-      reply: `I couldn't find a passage that clearly matches that question. ${sizeNote} Try rephrasing — e.g. mention the country by name ("freedom of expression in Kenya"), the right itself ("right to a fair trial"), or ask me to compare two countries.`,
-      hits: [],
-      confidence: 'low',
-    };
+        : `My corpus is still loading; only the offline bundle is ready right now.`,
+    );
   }
 
-  const top = hits[0];
-  const confidence: CitedAnswer['confidence'] =
-    top.score > 0.25 ? 'high' : top.score > 0.08 ? 'medium' : 'low';
+  return hitsReply(trimmed, hits, confidenceFromScore(hits[0].score));
+}
 
+function hitsReply(
+  trimmed: string,
+  hits: ScoredArticle[],
+  confidence: CitedAnswer['confidence'],
+): CitedAnswer {
+  const top = hits[0];
   const lead =
     confidence === 'high'
       ? `The closest provision in my indexed corpus is from **${top.constitution.country}**, **${top.article.article_number} — ${top.article.title}**:`
@@ -379,8 +418,7 @@ export function answer(query: string): CitedAnswer {
 
 export function retrieveForRAG(query: string, k = 6): ScoredArticle[] {
   const top = searchCorpus(query, k);
-  const { boosts } = buildIndex();
-  const mentioned = boosts.filter((c) => c.pattern.test(query)).map((c) => c.id);
+  const mentioned = countriesIn(query, buildIndex().boosts);
   if (mentioned.length < 2) return top;
 
   const deep = searchCorpus(query, 50);
@@ -406,3 +444,58 @@ export function retrieveForRAG(query: string, k = 6): ScoredArticle[] {
 
 export const confidenceFromScore = (score: number): CitedAnswer['confidence'] =>
   score > 0.25 ? 'high' : score > 0.08 ? 'medium' : 'low';
+
+// Database rows score rank + 1 when every search term matched, so a score >= 1 means an exact match.
+export async function fromDatabaseHits(hits: ArticleSearchHit[]): Promise<ScoredArticle[]> {
+  const byId = await constitutionsById();
+  return hits.flatMap(({ rank, matched_all, ...article }) => {
+    const constitution = byId.get(article.constitution_id);
+    return constitution ? [{ article, constitution, score: rank + (matched_all ? 1 : 0) }] : [];
+  });
+}
+
+// Unlike the local tokenizer, the database search keeps digits and "article", so "Article 9" works.
+const DATABASE_FILLER = new Set(
+  [
+    ...STOPWORDS,
+    'constitution', 'constitutions', 'constitutional',
+    'compare', 'comparison', 'vs', 'versus', 'difference', 'differences', 'differ', 'between',
+  ].filter((w) => w !== 'article' && w !== 'section'),
+);
+
+// Country names become a filter rather than search terms, since articles rarely name their own country.
+function databaseTerms(text: string, countries: Array<{ pattern: RegExp }>): string {
+  let rest = text;
+  for (const { pattern } of countries) rest = rest.replace(globally(pattern), ' ');
+  return rest
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => (t.length > 1 || /\d/.test(t)) && !DATABASE_FILLER.has(t))
+    .join(' ');
+}
+
+// Answers without downloading the corpus. Returns null when the database search is unavailable.
+export async function answerFromDatabase(query: string): Promise<CitedAnswer | null> {
+  const trimmed = query.trim();
+  if (!trimmed) return EMPTY_QUESTION;
+
+  const countries = await countryBoosts();
+  const mentioned = countriesIn(trimmed, countries);
+  const terms = databaseTerms(trimmed, countries) || trimmed;
+
+  if (COMPARE_TRIGGER.test(trimmed) && mentioned.length >= 2) {
+    const tops = await Promise.all(mentioned.map((id) => searchArticles(terms, [id], 1)));
+    if (tops.some((t) => t === null)) return null;
+    const perCountry = await fromDatabaseHits(tops.flatMap((t) => t ?? []));
+    if (perCountry.length >= 2) return compareReply(trimmed, perCountry);
+  }
+
+  const found = await searchArticles(terms, mentioned, 4);
+  if (found === null) return null;
+  const hits = await fromDatabaseHits(found);
+  if (hits.length === 0) {
+    return noMatchReply('I searched the full text of every constitution in the database.');
+  }
+  return hitsReply(trimmed, hits, hits[0].score >= 1 ? 'high' : 'low');
+}
