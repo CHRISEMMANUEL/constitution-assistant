@@ -13,18 +13,23 @@ import {
   type ScoredArticle,
 } from './ai';
 import { completeChat, isAiConfigured, sourceBlock, streamRAG, type ChatTurn } from './llm';
+import { Trace, type AgentStep } from './trace';
 import { describeProblems, problemCount, stripBadCitations, verifyAnswer } from './verifier';
-
-export type AgentStage = 'planning' | 'searching' | 'analyzing' | 'writing' | 'repairing';
 
 export interface PlannedSearch {
   query: string;
   countryIds: string[];
 }
 
+interface Plan {
+  searches: PlannedSearch[];
+  fromPlanner: boolean;
+}
+
 interface Findings {
   sources: ScoredArticle[];
   confidence: CitedAnswer['confidence'];
+  offline: boolean;
 }
 
 const MAX_SEARCHES = 4;
@@ -109,7 +114,7 @@ async function fallbackPlan(question: string): Promise<PlannedSearch[]> {
   return [{ query: question, countryIds: ids }];
 }
 
-async function plan(question: string, history: ChatTurn[], signal?: AbortSignal): Promise<PlannedSearch[]> {
+async function plan(question: string, history: ChatTurn[], signal?: AbortSignal): Promise<Plan> {
   let reply: string;
   try {
     reply = await completeChat(
@@ -121,20 +126,21 @@ async function plan(question: string, history: ChatTurn[], signal?: AbortSignal)
     const name = (err as Error).name;
     if (name === 'AbortError' || name === 'InvalidKeyError') throw err;
     console.warn('[agents] planner failed, searching with the question as typed.', err);
-    return fallbackPlan(question);
+    return { searches: await fallbackPlan(question), fromPlanner: false };
   }
 
   const searches = parsePlan(reply);
   if (searches.length === 0) {
     console.warn('[agents] planner reply had no usable searches.', reply.slice(0, 300));
-    return fallbackPlan(question);
+    return { searches: await fallbackPlan(question), fromPlanner: false };
   }
-  return Promise.all(
+  const planned = await Promise.all(
     searches.map(async (s) => ({
       query: s.query,
       countryIds: s.countries.length ? await mentionedCountryIds(s.countries.join(', ')) : [],
     })),
   );
+  return { searches: planned, fromPlanner: true };
 }
 
 function interleave(lists: ScoredArticle[][], max: number): ScoredArticle[] {
@@ -171,13 +177,13 @@ async function research(searches: PlannedSearch[]): Promise<Findings> {
     const exact = answered.filter((l) => l[0].score >= 1).length;
     const confidence: CitedAnswer['confidence'] =
       answered.length === 0 ? 'low' : exact === answered.length ? 'high' : exact > 0 ? 'medium' : 'low';
-    return { sources: interleave(lists, MAX_SOURCES), confidence };
+    return { sources: interleave(lists, MAX_SOURCES), confidence, offline: false };
   }
 
   await waitForCorpus();
   const lists = searches.map(searchLocally);
   const best = Math.max(0, ...lists.flat().map((h) => h.score));
-  return { sources: interleave(lists, MAX_SOURCES), confidence: confidenceFromScore(best) };
+  return { sources: interleave(lists, MAX_SOURCES), confidence: confidenceFromScore(best), offline: true };
 }
 
 // A comparison is any plan whose searches name two or more countries; each gets an analyst.
@@ -243,7 +249,7 @@ export interface SmartAnswerOptions {
   query: string;
   history?: ChatTurn[];
   signal?: AbortSignal;
-  onStage?: (stage: AgentStage) => void;
+  onTrace?: (steps: AgentStep[]) => void;
   onToken?: (token: string) => void;
   onReset?: () => void;
   onSources?: (sources: ScoredArticle[]) => void;
@@ -270,13 +276,16 @@ interface Draft {
 async function verifyAndRepair(
   draft: Draft,
   opts: SmartAnswerOptions,
+  trace: Trace,
 ): Promise<{ reply: string; unverifiedQuotes: number }> {
   const { sources } = draft;
+  trace.start('verifying');
   const report = verifyAnswer(draft.text, sources);
+  trace.note({ count: problemCount(report) });
   if (problemCount(report) === 0) return { reply: draft.text, unverifiedQuotes: 0 };
 
   console.warn('[agents] verifier found problems, asking the writer for one repair.', report);
-  opts.onStage?.('repairing');
+  trace.start('repairing');
   opts.onReset?.();
   let repaired = '';
   try {
@@ -302,6 +311,7 @@ async function verifyAndRepair(
   const useRepair = second !== null && problemCount(second) <= problemCount(report);
   const chosen = useRepair ? repaired.trim() : draft.text;
   const final = useRepair ? second : report;
+  trace.note({ repaired: useRepair });
   return {
     reply: stripBadCitations(chosen, sources.length),
     unverifiedQuotes: final.unmatchedQuotes.length,
@@ -316,8 +326,9 @@ async function localAnswer(query: string): Promise<CitedAnswer> {
 }
 
 export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer> => {
-  const { query, signal, onStage, onToken, onSources } = opts;
+  const { query, signal, onToken, onSources } = opts;
   const trimmed = query.trim();
+  const trace = new Trace(opts.onTrace);
 
   if (!trimmed) {
     const empty: CitedAnswer = {
@@ -331,34 +342,46 @@ export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer
   }
 
   if (!isAiConfigured()) {
+    trace.start('searching');
     const local = await localAnswer(trimmed);
+    trace.note({ count: local.hits.length });
+    trace.close();
     onSources?.(local.hits);
     onToken?.(local.reply);
     return tagProfileOnly(local);
   }
 
   const history = conversationHistory(opts.history ?? []);
-  let findings: Findings = { sources: [], confidence: 'low' };
+  let findings: Findings = { sources: [], confidence: 'low', offline: false };
   let accumulated = '';
   try {
-    onStage?.('planning');
-    const searches = await plan(trimmed, history, signal);
+    trace.start('planning');
+    const { searches, fromPlanner } = await plan(trimmed, history, signal);
+    const byId = await constitutionsById();
+    const countryName = (id: string) => byId.get(id)?.country ?? id;
+    trace.note({
+      searches: searches.map((s) => ({ query: s.query, countries: s.countryIds.map(countryName) })),
+      fallback: !fromPlanner,
+    });
 
-    onStage?.('searching');
+    trace.start('searching');
     findings = await research(searches);
+    trace.note({ count: findings.sources.length, fallback: findings.offline });
     onSources?.(findings.sources);
 
     if (findings.sources.length === 0) {
       const fallback = await localAnswer(trimmed);
+      trace.close();
       onSources?.(fallback.hits);
       onToken?.(fallback.reply);
       return tagProfileOnly(fallback);
     }
 
-    if (comparedCountries(searches).length > 1) onStage?.('analyzing');
+    const compared = comparedCountries(searches);
+    if (compared.length > 1) trace.start('analyzing', { countries: compared.map(countryName) });
     const notes = await analyze(trimmed, searches, findings.sources, signal);
 
-    onStage?.('writing');
+    trace.start('writing');
     await streamRAG({
       question: trimmed,
       sources: findings.sources,
@@ -372,6 +395,7 @@ export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer
     });
     const text = accumulated.trim();
     if (!text) {
+      trace.close();
       return tagProfileOnly({
         reply: (await localAnswer(trimmed)).reply,
         hits: findings.sources,
@@ -382,7 +406,9 @@ export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer
     const checked = await verifyAndRepair(
       { question: trimmed, sources: findings.sources, history, notes, text },
       opts,
+      trace,
     );
+    trace.close();
     return tagProfileOnly({
       reply: checked.reply,
       hits: findings.sources,
@@ -391,6 +417,7 @@ export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer
     });
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
+      trace.close('stopped');
       return {
         reply: accumulated || '_(generation cancelled)_',
         hits: findings.sources,
@@ -398,6 +425,7 @@ export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer
       };
     }
     console.warn('[agents] AI answer failed, falling back to local.', err);
+    trace.close('failed');
     const fallback = await localAnswer(trimmed);
     onToken?.(fallback.reply);
     const degraded = (err as Error).name === 'InvalidKeyError' ? 'invalid-key' : 'llm-unavailable';

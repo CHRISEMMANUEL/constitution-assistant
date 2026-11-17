@@ -11,7 +11,7 @@ const NO_ANSWER_OPENER = 'the provided sources do not contain a direct answer';
 const MIN_QUOTE_WORDS = 3;
 const MIN_INLINE_QUOTE_WORDS = 6;
 
-const normalize = (text: string): string =>
+export const normalize = (text: string): string =>
   text
     .normalize('NFKD')
     .toLowerCase()
@@ -55,6 +55,11 @@ const quoteFound = (quote: string, haystack: string): boolean =>
     .map(normalize)
     .filter((fragment) => fragment.split(' ').length >= MIN_QUOTE_WORDS)
     .every((fragment) => haystack.includes(fragment));
+
+// True when the quote is long enough to check and appears word for word in this one source.
+export const quoteInSource = (quote: string, source: ScoredArticle): boolean =>
+  wordCount(quote) >= MIN_QUOTE_WORDS &&
+  quoteFound(quote, normalize(`${source.article.title} ${source.article.content}`));
 
 export function verifyAnswer(reply: string, sources: ScoredArticle[]): VerifyReport {
   const cited = [...reply.matchAll(CITATION)].flatMap((m) => citedNumbers(m[1]));

@@ -5,7 +5,6 @@ import {
   Send,
   Bot,
   User,
-  Loader2,
   Sparkles,
   Mic,
   MicOff,
@@ -15,11 +14,16 @@ import {
   Play,
   StopCircle,
   KeyRound,
+  GraduationCap,
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { ApiKeyPanel } from '../components/ApiKeyPanel';
+import { AgentTimeline } from '../components/AgentTimeline';
+import { QuizCard } from '../components/QuizCard';
 import { type CitedAnswer } from '../services/ai';
-import { answerSmart, type AgentStage } from '../services/agents';
+import { answerSmart } from '../services/agents';
+import { buildQuiz, type Quiz } from '../services/tutor';
+import type { AgentStep } from '../services/trace';
 import { providerById, useApiKey, usePreferredModel, useProviderId } from '../services/aiKey';
 import { useVoice } from '../lib/useVoice';
 import { useTranslation } from 'react-i18next';
@@ -33,6 +37,9 @@ type Message = {
   confidence?: CitedAnswer['confidence'];
   degraded?: CitedAnswer['degraded'];
   unverifiedQuotes?: number;
+  trace?: AgentStep[];
+  kind?: 'quiz';
+  quiz?: Quiz;
 };
 
 const SUGGESTIONS = [
@@ -46,14 +53,6 @@ const confidenceStyles: Record<NonNullable<Message['confidence']>, string> = {
   high: 'text-sage-500 bg-sage-500/10 border-sage-500/30',
   medium: 'text-honey-500 bg-honey-500/10 border-honey-500/30',
   low: 'text-rose-500 bg-rose-500/10 border-rose-500/30',
-};
-
-const stageLabel: Record<AgentStage, string> = {
-  planning: 'assistant.stage_planning',
-  searching: 'assistant.finding_sources',
-  analyzing: 'assistant.stage_analyzing',
-  writing: 'assistant.stage_writing',
-  repairing: 'assistant.stage_repairing',
 };
 
 const degradedNotice: Record<NonNullable<Message['degraded']>, string> = {
@@ -197,7 +196,6 @@ export const Assistant: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
-  const [stage, setStage] = useState<AgentStage>('searching');
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
   const [readingWordIndex, setReadingWordIndex] = useState(-1);
@@ -253,7 +251,9 @@ export const Assistant: React.FC = () => {
     if (!text || loading) return;
     voice.stopListening();
 
-    const history = messagesRef.current.map(({ role, content }) => ({ role, content }));
+    const history = messagesRef.current
+      .filter((m) => m.kind !== 'quiz')
+      .map(({ role, content }) => ({ role, content }));
     const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', content: text };
     const aiId = `a-${Date.now()}`;
     setMessages((prev) => [
@@ -264,7 +264,6 @@ export const Assistant: React.FC = () => {
     setInput('');
     setLoading(true);
     setStreaming(true);
-    setStage('searching');
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -274,7 +273,9 @@ export const Assistant: React.FC = () => {
         query: text,
         history,
         signal: controller.signal,
-        onStage: setStage,
+        onTrace: (trace) => {
+          setMessages((prev) => prev.map((m) => (m.id === aiId ? { ...m, trace } : m)));
+        },
         onSources: (sources) => {
           setMessages((prev) =>
             prev.map((m) =>
@@ -342,6 +343,47 @@ export const Assistant: React.FC = () => {
 
   const stopGenerating = () => {
     abortRef.current?.abort();
+  };
+
+  // The tutor quizzes the student on the sources of one answer, asked about the question before it.
+  const startQuiz = async (answerMsg: Message) => {
+    const sources = answerMsg.citations;
+    if (loading || !sources?.length) return;
+    const all = messagesRef.current;
+    const topic =
+      all
+        .slice(0, all.findIndex((m) => m.id === answerMsg.id))
+        .reverse()
+        .find((m) => m.role === 'user')?.content ?? '';
+
+    const quizId = `q-${Date.now()}`;
+    const update = (patch: Partial<Message>) =>
+      setMessages((prev) => prev.map((m) => (m.id === quizId ? { ...m, ...patch } : m)));
+    setMessages((prev) => [...prev, { id: quizId, role: 'assistant', kind: 'quiz', content: '' }]);
+    setLoading(true);
+    setStreaming(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const quiz = await buildQuiz({
+        topic,
+        sources,
+        signal: controller.signal,
+        onTrace: (trace) => update({ trace }),
+      });
+      update({ quiz });
+    } catch (err) {
+      const name = (err as Error).name;
+      if (name !== 'AbortError' && name !== 'NoQuizError') console.error('[tutor]', err);
+      const notice =
+        name === 'AbortError' ? 'tutor.stopped' : name === 'InvalidKeyError' ? 'tutor.invalid_key' : 'tutor.failed';
+      update({ content: t(notice) });
+    } finally {
+      setLoading(false);
+      setStreaming(false);
+      abortRef.current = null;
+    }
   };
 
   const handleMessageSpeak = (msg: Message) => {
@@ -477,7 +519,16 @@ export const Assistant: React.FC = () => {
                     : 'bg-paper-soft dark:bg-ink-900/60 border border-slate/15 dark:border-ink-700 rounded-2xl rounded-tl-none text-ink-100 dark:text-paper'
                 } p-3 sm:p-4 max-w-[85%] sm:max-w-[88%] space-y-2 shadow-sm leading-relaxed text-[13px] sm:text-sm break-words`}
               >
-                {msg.role === 'assistant' ? (
+                {msg.role === 'assistant' && msg.trace && (
+                  <AgentTimeline
+                    steps={msg.trace}
+                    live={loading && msg.trace.some((s) => s.status === 'running')}
+                  />
+                )}
+
+                {msg.quiz ? (
+                  <QuizCard quiz={msg.quiz} />
+                ) : msg.role === 'assistant' ? (
                   activeSpeakingId === msg.id && msg.plain ? (
                     renderReadingText(msg.plain, readingWordIndex)
                   ) : (
@@ -507,7 +558,7 @@ export const Assistant: React.FC = () => {
                   </div>
                 )}
 
-                {msg.role === 'assistant' && (
+                {msg.role === 'assistant' && msg.kind !== 'quiz' && (
                   <div className="flex flex-wrap items-center gap-2 pt-2">
                     {msg.confidence && (
                       <span
@@ -524,10 +575,20 @@ export const Assistant: React.FC = () => {
                         {c.constitution.flag} {c.article.article_number}
                       </span>
                     ))}
+                    <div className="ml-auto flex items-center gap-2">
+                    {apiKey && !loading && !!msg.citations?.length && (
+                      <button
+                        onClick={() => startQuiz(msg)}
+                        className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-slate/25 dark:border-ink-700 text-slate dark:text-mist hover:border-iris-500 hover:text-iris-500 transition-colors"
+                        title={t('tutor.button_title')}
+                      >
+                        <GraduationCap className="w-3 h-3" /> {t('tutor.button')}
+                      </button>
+                    )}
                     {voice.supportsSynthesis && msg.plain && (
                       <button
                         onClick={() => handleMessageSpeak(msg)}
-                        className="ml-auto flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-slate/25 dark:border-ink-700 text-slate dark:text-mist hover:border-iris-500 hover:text-iris-500 transition-colors"
+                        className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-slate/25 dark:border-ink-700 text-slate dark:text-mist hover:border-iris-500 hover:text-iris-500 transition-colors"
                       >
                         {activeSpeakingId === msg.id && voice.speaking ? (
                           <>
@@ -540,27 +601,12 @@ export const Assistant: React.FC = () => {
                         )}
                       </button>
                     )}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           ))}
-
-          {loading &&
-            !messages[messages.length - 1]?.content &&
-            messages[messages.length - 1]?.role === 'assistant' && (
-              <div className="flex gap-2 sm:gap-3 -mt-2">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-iris-500/15 flex items-center justify-center shrink-0 text-iris-500">
-                  <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                <div className="bg-paper-soft dark:bg-ink-900/60 border border-slate/15 dark:border-ink-700 rounded-2xl rounded-tl-none p-3 sm:p-4 flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-iris-500" />
-                  <span className="text-slate dark:text-mist text-xs sm:text-sm">
-                    {t(stageLabel[stage])}
-                  </span>
-                </div>
-              </div>
-            )}
         </div>
 
         <div className="p-2.5 sm:p-3 md:p-4 bg-slate/5 dark:bg-ink-900/40 border-t border-slate/15 dark:border-ink-700">

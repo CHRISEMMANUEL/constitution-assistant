@@ -61,13 +61,16 @@ export interface ChatTurn {
   content: string;
 }
 
-export type RequestKind = 'answer' | 'plan' | 'analyze';
+export type RequestKind = 'answer' | 'plan' | 'analyze' | 'tutor';
 
 const TOKEN_LIMITS: Record<RequestKind, { chat: number; openai: number; claude: number }> = {
   answer: { chat: 800, openai: 4000, claude: 8000 },
   plan: { chat: 600, openai: 2000, claude: 2000 },
   analyze: { chat: 500, openai: 2000, claude: 2000 },
+  tutor: { chat: 1500, openai: 4000, claude: 4000 },
 };
+
+const TEMPERATURE: Record<RequestKind, number> = { answer: 0.15, plan: 0, analyze: 0.15, tutor: 0.4 };
 
 interface ChatRequest {
   kind: RequestKind;
@@ -113,7 +116,7 @@ function chatBody(provider: AiProvider, modelId: string, req: ChatRequest): stri
   return JSON.stringify({
     model: modelId,
     stream: true,
-    temperature: req.kind === 'plan' ? 0 : 0.15,
+    temperature: TEMPERATURE[req.kind],
     max_tokens: limits.chat,
     messages,
   });

@@ -255,21 +255,31 @@ export async function mentionedCountryIds(text: string): Promise<string[]> {
 export const isProfileOnlyArticle = (a: BundledArticle | Article): boolean =>
   typeof a.id === 'string' && a.id.endsWith('-profile');
 
+// Country names and "constitution" are dropped from local queries, as in the database search: they
+// match articles that name their own country ("Supreme Court of Nigeria") rather than the subject.
+function queryTokens(query: string, boosts: Array<{ pattern: RegExp }>): string[] {
+  let rest = query;
+  for (const { pattern } of boosts) rest = rest.replace(globally(pattern), ' ');
+  const tokens = tokenize(rest.replace(/\bconstitution(?:s|al)?\b/gi, ' '));
+  return tokens.length ? tokens : tokenize(query);
+}
+
+// A named country is a filter, not a boost: a question about Nigeria never answers from Serbia.
 export function searchCorpus(query: string, k = 4): ScoredArticle[] {
   const { entries, idf, boosts } = buildIndex();
-  const qTokens = tokenize(query);
+  const qTokens = queryTokens(query, boosts);
   if (qTokens.length === 0) return [];
 
-  const targetCountry = countriesIn(query, boosts)[0];
+  const countries = countriesIn(query, boosts);
+  const pool = countries.length ? entries.filter((e) => countries.includes(e.constitution.id)) : entries;
 
-  const scored: ScoredArticle[] = entries.map((e) => {
+  const scored: ScoredArticle[] = pool.map((e) => {
     let score = 0;
     for (const t of qTokens) {
       const tf = e.termFreq.get(t);
       if (!tf) continue;
       score += (tf / e.length) * (idf.get(t) ?? 0);
     }
-    if (targetCountry && e.constitution.id === targetCountry) score *= 1.6;
     return { article: e.article, constitution: e.constitution, score };
   });
 
@@ -304,7 +314,7 @@ function compareAcrossCountries(query: string): CitedAnswer | null {
   const { entries, idf, boosts } = buildIndex();
   const mentioned = countriesIn(query, boosts);
   if (mentioned.length < 2) return null;
-  const qTokens = tokenize(query);
+  const qTokens = queryTokens(query, boosts);
 
   const perCountry: ScoredArticle[] = [];
   for (const id of mentioned) {

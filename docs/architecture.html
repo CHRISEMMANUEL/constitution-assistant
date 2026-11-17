@@ -23,7 +23,7 @@
 <body>
 <main>
 <h1>Constitution Assistant: architecture</h1>
-<p>The original single-call RAG pipeline, and the multi-agent version replacing it. Phase 1 (Planner, Researchers, Writer, chat history) and Phase 2 (per-country Analysts, Verifier) are built. It runs in the browser, because each user brings their own key and the key never leaves the browser.</p>
+<p>The original single-call RAG pipeline, and the multi-agent version replacing it. Phase 1 (Planner, Researchers, Writer, chat history), Phase 2 (per-country Analysts, Verifier) and Phase 3 (agent step timeline, Tutor) are built. It runs in the browser, because each user brings their own key and the key never leaves the browser.</p>
 
 <h2>Before: one model call, retrieval in the browser</h2>
 <svg viewBox="0 0 960 430" role="img" aria-label="Current architecture diagram">
@@ -96,8 +96,8 @@
 
   <rect x="40" y="250" width="210" height="80" rx="8" fill="#fff" stroke="#1f2a44"/>
   <text x="52" y="275" class="t">Agent step timeline</text>
-  <text x="52" y="295" class="s">Planning → Searching →</text>
-  <text x="52" y="312" class="s">Writing → Verified</text>
+  <text x="52" y="295" class="s">each step: what it did + time</text>
+  <text x="52" y="312" class="s">trace.ts → AgentTimeline</text>
 
   <rect x="40" y="480" width="210" height="80" rx="8" fill="#fff" stroke="#1f2a44" stroke-dasharray="4 3"/>
   <text x="52" y="505" class="t">Local TF-IDF fallback</text>
@@ -132,7 +132,7 @@
   <text x="377" y="520" class="s">code check quotes + sources; 1 repair</text>
 
   <rect x="365" y="560" width="300" height="38" rx="8" fill="#fff" stroke="#b8893b" stroke-dasharray="4 3"/>
-  <text x="377" y="584" class="s">optional · Tutor (plain language + quiz)</text>
+  <text x="377" y="584" class="s">on request · Tutor quiz, code-checked</text>
 
   <line x1="515" y1="135" x2="515" y2="173" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
   <line x1="515" y1="235" x2="515" y2="273" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
@@ -142,7 +142,7 @@
   <line x1="250" y1="105" x2="363" y2="105" stroke="#1f2a44" stroke-width="1.5" marker-end="url(#a2)"/>
   <text x="275" y="97" class="lbl">call</text>
   <path d="M365,505 L290,505 L290,290 L252,290" fill="none" stroke="#b8893b" stroke-width="1.8" marker-end="url(#a3)"/>
-  <text x="198" y="385" class="lbl" transform="rotate(-90 308 385)">stage · sources · tokens</text>
+  <text x="198" y="385" class="lbl" transform="rotate(-90 308 385)">trace · sources · tokens</text>
 
   <text x="760" y="54" class="group">DATA &amp; MODELS</text>
   <rect x="750" y="175" width="190" height="60" rx="8" fill="#fff" stroke="#1f2a44"/>
@@ -168,7 +168,7 @@
 <ol>
   <li>Done: <code>search_articles</code> RPC migration, and Planner, Researchers and Writer (with chat history) in <code>src/services/agents.ts</code>.</li>
   <li>Done: per-country Analysts for comparisons (<code>agents.ts</code>) and the code Verifier (<code>src/services/verifier.ts</code>) with one repair.</li>
-  <li>Tutor/quiz agent + agent step timeline in the UI.</li>
+  <li>Done: agent step timeline (<code>src/services/trace.ts</code>, <code>src/components/AgentTimeline.tsx</code>) and the Tutor (<code>src/services/tutor.ts</code>, <code>src/components/QuizCard.tsx</code>): 3 to 5 multiple-choice questions from one answer's sources, each checked in code (options, answer index, source number, verbatim quote), one rewrite when fewer than three pass, options shuffled in code.</li>
 </ol>
 </main>
 </body>

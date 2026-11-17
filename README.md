@@ -35,7 +35,11 @@ With an API key saved, each question goes through these agents, all run in the b
 4. **Writer** (one streamed model call): answers from those articles only, cites them as [Source N], and sees the last few turns of the conversation so follow-ups read naturally.
 5. **Verifier** (code, no model call; [src/services/verifier.ts](src/services/verifier.ts)): checks that every [Source N] exists, that every quote appears word for word in a source (ignoring case and punctuation, allowing `…` and `[bracketed]` edits), and that the answer cites something unless it opens with "The provided sources do not contain a direct answer". If anything fails, the Writer is asked once to rewrite the answer with the problems listed. Citations that still point past the source list are removed, and a quote that still doesn't match shows a warning under the answer.
 
-On OpenRouter, if a free model is rate-limited, the next free model is tried. If the key is rejected or the provider fails, the app shows a direct quotation instead. If the search function isn't installed yet, the Researchers use the in-browser TF-IDF index (all articles, loaded from Supabase the first time a local search needs them). With no key saved, the app quotes the best-matching articles from the same `search_articles` function, so nothing large is downloaded: country names and demonyms in the question (Nigeria, Nigerian, the US) become a country filter, and a comparison question gets the best article from each country. Only if that function fails does it fall back to the in-browser index.
+On OpenRouter, if a free model is rate-limited, the next free model is tried. If the key is rejected or the provider fails, the app shows a direct quotation instead. If the search function isn't installed yet, the Researchers use the in-browser TF-IDF index (all articles, loaded from Supabase the first time a local search needs them). With no key saved, the app quotes the best-matching articles from the same `search_articles` function, so nothing large is downloaded: country names and demonyms in the question (Nigeria, Nigerian, the US) become a country filter, and a comparison question gets the best article from each country. Only if that function fails does it fall back to the in-browser index, which filters by country the same way and ignores country names and "constitution" as search words.
+
+**Agent steps.** Every reply shows the steps the agents took ([src/services/trace.ts](src/services/trace.ts), drawn by [src/components/AgentTimeline.tsx](src/components/AgentTimeline.tsx)): the planned searches and their countries, how many sources were found and whether the database or the in-browser index answered, which countries got an analyst, the verifier's result and whether a rewrite was kept, with the time each step took. The list is open while the agents work and folds into "Agent steps" when they finish.
+
+**Tutor** (with a key; [src/services/tutor.ts](src/services/tutor.ts)): **Quiz me** under a cited answer asks the model for 3 to 5 multiple-choice questions written only from that answer's sources. Code checks each one: four different options, an answer index from 0 to 3, a real source number, and a 5-to-30-word quote that appears word for word in that source. Questions that fail are dropped; if fewer than three pass, the Tutor is asked once to rewrite them, and the rewrite is kept only if more questions pass. Options are shuffled in code, since models tend to put the right answer first. After each pick the quiz shows the explanation, the quote and the source ([src/components/QuizCard.tsx](src/components/QuizCard.tsx)). Quizzes are not sent back to the model as chat history.
 
 ### Your own AI key
 
@@ -54,7 +58,7 @@ The providers are listed in [src/services/aiKey.ts](src/services/aiKey.ts) and c
 
 The key is stored in the browser's `localStorage` and is only ever sent to the provider you chose. It is never saved to Supabase or sent to any server run by this project. **Remove key** deletes it from the browser.
 
-The agent design and the remaining phase (Tutor/quiz agent, agent timeline in the chat) are in [docs/architecture.html](docs/architecture.html).
+The agent design is in [docs/architecture.html](docs/architecture.html).
 
 ## Running locally
 
