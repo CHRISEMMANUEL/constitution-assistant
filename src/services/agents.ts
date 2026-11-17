@@ -13,6 +13,7 @@ import {
   type ScoredArticle,
 } from './ai';
 import { completeChat, isAiConfigured, sourceBlock, streamRAG, type ChatTurn } from './llm';
+import { SMALL_TALK_REPLIES, smallTalkKind } from './smallTalk';
 import { Trace, type AgentStep } from './trace';
 import { describeProblems, problemCount, stripBadCitations, verifyAnswer } from './verifier';
 
@@ -339,6 +340,13 @@ export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer
     };
     onToken?.(empty.reply);
     return empty;
+  }
+
+  const chat = smallTalkKind(trimmed);
+  if (chat) {
+    const reply: CitedAnswer = { reply: SMALL_TALK_REPLIES[chat], hits: [], confidence: 'high' };
+    onToken?.(reply.reply);
+    return reply;
   }
 
   if (!isAiConfigured()) {

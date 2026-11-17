@@ -305,7 +305,7 @@ export const Assistant: React.FC = () => {
                 content: result.reply,
                 plain: cleanForSpeech(result.reply),
                 citations: result.hits,
-                confidence: result.confidence,
+                confidence: result.hits.length ? result.confidence : undefined,
                 degraded: result.degraded,
                 unverifiedQuotes: result.unverifiedQuotes,
               }
