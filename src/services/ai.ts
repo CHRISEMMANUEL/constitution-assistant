@@ -19,6 +19,8 @@ export interface CitedAnswer {
   confidence: 'high' | 'medium' | 'low';
   degraded?: 'llm-unavailable' | 'invalid-key' | 'profile-only';
   unverifiedQuotes?: number;
+  // Set when the question named no country: the reply asks which one, offering these as choices.
+  askCountry?: { question: string; countries: Array<{ id: string; name: string; flag: string }> };
 }
 
 export interface ScoredArticle {
@@ -250,6 +252,12 @@ function countryBoosts(): Promise<Array<{ pattern: RegExp; id: string }>> {
 
 export async function mentionedCountryIds(text: string): Promise<string[]> {
   return countriesIn(text, await countryBoosts());
+}
+
+export async function withoutCountryNames(text: string): Promise<string> {
+  let rest = text;
+  for (const { pattern } of await countryBoosts()) rest = rest.replace(globally(pattern), ' ');
+  return rest;
 }
 
 export const isProfileOnlyArticle = (a: BundledArticle | Article): boolean =>

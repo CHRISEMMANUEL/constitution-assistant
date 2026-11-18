@@ -12,6 +12,13 @@ import {
   type CitedAnswer,
   type ScoredArticle,
 } from './ai';
+import {
+  answerToCountryQuestion,
+  askForCountry,
+  contextCountryIds,
+  inCountries,
+  isGlobalQuestion,
+} from './countryCheck';
 import { completeChat, isAiConfigured, sourceBlock, streamRAG, type ChatTurn } from './llm';
 import { SMALL_TALK_REPLIES, smallTalkKind } from './smallTalk';
 import { Trace, type AgentStep } from './trace';
@@ -249,6 +256,9 @@ async function analyze(
 export interface SmartAnswerOptions {
   query: string;
   history?: ChatTurn[];
+  // The question the previous reply asked a country for, and whether the user chose every country.
+  pendingQuestion?: string;
+  allCountries?: boolean;
   signal?: AbortSignal;
   onTrace?: (steps: AgentStep[]) => void;
   onToken?: (token: string) => void;
@@ -327,8 +337,8 @@ async function localAnswer(query: string): Promise<CitedAnswer> {
 }
 
 export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer> => {
-  const { query, signal, onToken, onSources } = opts;
-  const trimmed = query.trim();
+  const { signal, onToken, onSources } = opts;
+  let trimmed = opts.query.trim();
   const trace = new Trace(opts.onTrace);
 
   if (!trimmed) {
@@ -342,11 +352,30 @@ export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer
     return empty;
   }
 
-  const chat = smallTalkKind(trimmed);
+  // Runs before small talk, which would take a bare "all" as a greeting.
+  const picked = opts.pendingQuestion
+    ? await answerToCountryQuestion(trimmed, opts.pendingQuestion, opts.allCountries)
+    : null;
+  if (picked) trimmed = picked.query;
+
+  const chat = !picked && smallTalkKind(trimmed);
   if (chat) {
     const reply: CitedAnswer = { reply: SMALL_TALK_REPLIES[chat], hits: [], confidence: 'high' };
     onToken?.(reply.reply);
     return reply;
+  }
+
+  // A question that names no country is not searched across every constitution: it takes the
+  // country from earlier turns, or the reply asks which country is meant. Both paths, key or not.
+  const history = conversationHistory(opts.history ?? []);
+  if (!picked?.allCountries && !isGlobalQuestion(trimmed) && (await mentionedCountryIds(trimmed)).length === 0) {
+    const fromContext = await contextCountryIds(history);
+    if (fromContext.length === 0) {
+      const ask = await askForCountry(trimmed);
+      onToken?.(ask.reply);
+      return ask;
+    }
+    trimmed = await inCountries(trimmed, fromContext);
   }
 
   if (!isAiConfigured()) {
@@ -359,7 +388,6 @@ export const answerSmart = async (opts: SmartAnswerOptions): Promise<CitedAnswer
     return tagProfileOnly(local);
   }
 
-  const history = conversationHistory(opts.history ?? []);
   let findings: Findings = { sources: [], confidence: 'low', offline: false };
   let accumulated = '';
   try {

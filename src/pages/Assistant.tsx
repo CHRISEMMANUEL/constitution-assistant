@@ -37,6 +37,7 @@ type Message = {
   confidence?: CitedAnswer['confidence'];
   degraded?: CitedAnswer['degraded'];
   unverifiedQuotes?: number;
+  askCountry?: CitedAnswer['askCountry'];
   trace?: AgentStep[];
   kind?: 'quiz';
   quiz?: Quiz;
@@ -234,11 +235,14 @@ export const Assistant: React.FC = () => {
     });
   }, [messages, loading]);
 
-  const ask = async (q: string) => {
+  // A country chip names the question it answers; a typed reply answers the last "which country?".
+  const ask = async (q: string, pick?: { question: string; allCountries?: boolean }) => {
     const text = q.trim();
     if (!text || loading) return;
     voice.stopListening();
 
+    const last = messagesRef.current[messagesRef.current.length - 1];
+    const pending = pick ?? (last?.askCountry ? { question: last.askCountry.question } : undefined);
     const history = messagesRef.current
       .filter((m) => m.kind !== 'quiz')
       .map(({ role, content }) => ({ role, content }));
@@ -260,6 +264,8 @@ export const Assistant: React.FC = () => {
       const result = await answerSmart({
         query: text,
         history,
+        pendingQuestion: pending?.question,
+        allCountries: pending?.allCountries,
         signal: controller.signal,
         onTrace: (trace) => {
           setMessages((prev) => prev.map((m) => (m.id === aiId ? { ...m, trace } : m)));
@@ -285,24 +291,26 @@ export const Assistant: React.FC = () => {
         },
       });
 
+      const reply = result.askCountry ? t('assistant.ask_country') : result.reply;
       setMessages((prev) =>
         prev.map((m) =>
           m.id === aiId
             ? {
                 ...m,
-                content: result.reply,
-                plain: cleanForSpeech(result.reply),
+                content: reply,
+                plain: cleanForSpeech(reply),
                 citations: result.hits,
                 confidence: result.hits.length ? result.confidence : undefined,
                 degraded: result.degraded,
                 unverifiedQuotes: result.unverifiedQuotes,
+                askCountry: result.askCountry,
               }
             : m,
         ),
       );
 
       if (autoSpeak) {
-        const plain = cleanForSpeech(result.reply);
+        const plain = cleanForSpeech(reply);
         if (plain) {
           setActiveSpeakingId(aiId);
           voice.speak(plain);
@@ -419,6 +427,26 @@ export const Assistant: React.FC = () => {
     if (voice.listening) voice.stopListening();
     else voice.startListening();
   };
+
+  const chipClass =
+    'text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-slate/30 dark:border-ink-700 text-slate dark:text-mist hover:border-iris-500 hover:text-iris-500 transition-colors disabled:opacity-50';
+
+  const countryChoices = ({ question, countries }: NonNullable<Message['askCountry']>) => (
+    <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-1">
+      {countries.map((c) => (
+        <button key={c.id} onClick={() => ask(c.name, { question })} disabled={loading} className={chipClass}>
+          {c.flag} {c.name}
+        </button>
+      ))}
+      <button
+        onClick={() => ask(t('assistant.all_countries'), { question, allCountries: true })}
+        disabled={loading}
+        className={chipClass}
+      >
+        {t('assistant.all_countries')}
+      </button>
+    </div>
+  );
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 min-h-0">
@@ -559,6 +587,8 @@ export const Assistant: React.FC = () => {
                 ) : (
                   <p>{msg.content}</p>
                 )}
+
+                {msg.askCountry && countryChoices(msg.askCountry)}
 
                 {msg.role === 'assistant' && msg.degraded && (
                   <div
