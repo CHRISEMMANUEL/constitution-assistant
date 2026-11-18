@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'robots.txt'],
       manifest: {
-        name: "Constitution Assistant — The World's Constitutions",
-        short_name: 'Constitution',
+        name: "ConstIntell — The World's Constitutions",
+        short_name: 'ConstIntell',
         description:
           "Browse, listen to, and ask AI about every country's constitution. Cited primary sources, free, works offline.",
         theme_color: '#24772D',

@@ -1,4 +1,4 @@
-# ConstIntell: Constitution Assistant
+# ConstIntell
 
 Read, search and compare the constitutions of the world, and ask an AI assistant questions that are answered only from the constitutional text, with every claim cited back to the article it came from.
 
