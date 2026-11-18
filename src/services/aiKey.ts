@@ -85,6 +85,7 @@ const write = (name: string, value: string): void => {
     if (value.trim()) localStorage.setItem(name, value.trim());
     else localStorage.removeItem(name);
   } catch {
+    // Storage blocked (private mode) or full: the key lives for this page only.
   }
 };
 

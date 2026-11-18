@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export interface BookmarkRecord {
@@ -27,16 +27,40 @@ const subscribe = (fn: Listener) => {
   };
 };
 
-const readJson = <T,>(key: string, fallback: T): T => {
-  if (typeof window === 'undefined') return fallback;
+// Same-tab writes call notify(); other tabs fire 'storage'.
+const subscribeStore = (fn: Listener) => {
+  const off = subscribe(fn);
+  window.addEventListener('storage', fn);
+  return () => {
+    off();
+    window.removeEventListener('storage', fn);
+  };
+};
+
+const readRaw = (key: string): string | null => {
+  if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return parsed as T;
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const parseJson = <T,>(raw: string | null, fallback: T): T => {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
   } catch {
     return fallback;
   }
+};
+
+const readJson = <T,>(key: string, fallback: T): T => parseJson(readRaw(key), fallback);
+
+// The snapshot is the raw string, which compares equal between reads, so the list only re-parses when it changes.
+const useStoredList = <T,>(key: string): T[] => {
+  const raw = useSyncExternalStore(subscribeStore, () => readRaw(key), () => null);
+  return useMemo(() => parseJson<T[]>(raw, []), [raw]);
 };
 
 const writeJson = (key: string, value: unknown) => {
@@ -44,6 +68,7 @@ const writeJson = (key: string, value: unknown) => {
     localStorage.setItem(key, JSON.stringify(value));
     notify();
   } catch {
+    // Storage blocked (private mode) or full: nothing is saved.
   }
 };
 
@@ -51,23 +76,7 @@ export const useBookmarks = () => {
   const { user } = useAuth();
   const uid = user?.id ?? 'anon';
 
-  const [items, setItems] = useState<BookmarkRecord[]>(() =>
-    readJson<BookmarkRecord[]>(BOOKMARKS_KEY(uid), []),
-  );
-
-  useEffect(() => {
-    setItems(readJson<BookmarkRecord[]>(BOOKMARKS_KEY(uid), []));
-
-    const handler = () => {
-      setItems(readJson<BookmarkRecord[]>(BOOKMARKS_KEY(uid), []));
-    };
-    const off = subscribe(handler);
-    window.addEventListener('storage', handler);
-    return () => {
-      off();
-      window.removeEventListener('storage', handler);
-    };
-  }, [uid]);
+  const items = useStoredList<BookmarkRecord>(BOOKMARKS_KEY(uid));
 
   const isBookmarked = useCallback(
     (articleId: string) => items.some((b) => b.article_id === articleId),
@@ -111,23 +120,7 @@ export const useRecentlyViewed = () => {
   const { user } = useAuth();
   const uid = user?.id ?? 'anon';
 
-  const [items, setItems] = useState<RecentRecord[]>(() =>
-    readJson<RecentRecord[]>(RECENT_KEY(uid), []),
-  );
-
-  useEffect(() => {
-    setItems(readJson<RecentRecord[]>(RECENT_KEY(uid), []));
-
-    const handler = () => {
-      setItems(readJson<RecentRecord[]>(RECENT_KEY(uid), []));
-    };
-    const off = subscribe(handler);
-    window.addEventListener('storage', handler);
-    return () => {
-      off();
-      window.removeEventListener('storage', handler);
-    };
-  }, [uid]);
+  const items = useStoredList<RecentRecord>(RECENT_KEY(uid));
 
   const visit = useCallback(
     (constitutionId: string) => {

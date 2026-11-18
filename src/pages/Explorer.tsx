@@ -138,8 +138,10 @@ export const Explorer: React.FC = () => {
   useTrackVisit(constitutionId);
 
   const { constitutions, constitutionsLoading, getArticles } = useData();
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [articlesLoading, setArticlesLoading] = useState(false);
+  // Articles remember which country they belong to; until the open country's arrive, it is loading.
+  const [loaded, setLoaded] = useState<{ id: string; articles: Article[] } | null>(null);
+  const articlesLoading = !!constitutionId && loaded?.id !== constitutionId;
+  const articles = constitutionId && loaded?.id === constitutionId ? loaded.articles : [];
   const [continent, setContinent] = useState<Region | 'all'>('all');
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
   const [catalogueFailed, setCatalogueFailed] = useState(false);
@@ -155,17 +157,12 @@ export const Explorer: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!constitutionId) {
-      setArticles([]);
-      return;
-    }
+    if (!constitutionId) return;
     let cancelled = false;
-    setArticlesLoading(true);
     getArticles(constitutionId).then((data) => {
       if (cancelled) return;
-      setArticles(data);
+      setLoaded({ id: constitutionId, articles: data });
       setActiveArticleId(data[0]?.id ?? null);
-      setArticlesLoading(false);
     });
     return () => {
       cancelled = true;
@@ -176,9 +173,12 @@ export const Explorer: React.FC = () => {
     () => constitutions.find((c) => c.id === constitutionId) ?? null,
     [constitutions, constitutionId],
   );
-  useEffect(() => {
-    if (activeConstitution) setContinent(activeConstitution.region);
-  }, [activeConstitution]);
+  // Opening a country switches the continent filter to its region once; the reader can change it after.
+  const [continentSetFor, setContinentSetFor] = useState<string | null>(null);
+  if (activeConstitution && continentSetFor !== activeConstitution.id) {
+    setContinentSetFor(activeConstitution.id);
+    setContinent(activeConstitution.region);
+  }
 
   const filteredCountries = useMemo(
     () =>

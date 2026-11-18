@@ -21,7 +21,7 @@ export interface Constitution extends BundledConstitution {
   official_translation?: boolean | null;
   retrieved_at?: string | null;
 }
-export interface Article extends BundledArticle {}
+export type Article = BundledArticle;
 export type { Region };
 
 const isPlaceholderEnv = !import.meta.env.VITE_SUPABASE_URL;

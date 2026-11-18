@@ -171,6 +171,7 @@ async function streamFromResponse(
           const delta = json.choices?.[0]?.delta?.content;
           if (delta) onToken(delta);
         } catch {
+          // A malformed event from the provider: skip it and keep streaming.
         }
       }
     }

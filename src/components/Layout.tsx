@@ -27,7 +27,10 @@ export const Layout: React.FC = () => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { user, signOut, loading } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
+  // The menu is open only on the page it was opened on, so navigating closes it.
+  const [menuOpenOn, setMenuOpenOn] = useState<string | null>(null);
+  const menuOpen = menuOpenOn === location.pathname;
+  const setMenuOpen = (open: boolean) => setMenuOpenOn(open ? location.pathname : null);
   const [accountOpen, setAccountOpen] = useState(false);
   const { t, i18n } = useTranslation();
 
@@ -49,10 +52,6 @@ export const Layout: React.FC = () => {
       document.body.style.overflow = prev;
     };
   }, [menuOpen]);
-
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
 
   const initials =
     (user?.user_metadata?.full_name as string | undefined)

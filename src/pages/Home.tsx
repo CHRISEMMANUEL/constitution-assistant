@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ArrowRight,
   Search,
@@ -45,11 +45,11 @@ export const Home: React.FC = () => {
     user?.email?.[0]?.toUpperCase() ||
     'U';
 
-  useEffect(() => {
-    if (!countryId) return;
+  const changeContinent = (next: Region | 'all') => {
+    setContinent(next);
     const c = constitutions.find((x) => x.id === countryId);
-    if (continent !== 'all' && c && c.region !== continent) setCountryId(null);
-  }, [continent, countryId, constitutions]);
+    if (next !== 'all' && c && c.region !== next) setCountryId(null);
+  };
 
   const filteredCountries = useMemo(
     () =>
@@ -180,7 +180,7 @@ export const Home: React.FC = () => {
             {t('home.pick_continent')}
           </div>
 
-          <ContinentSelector value={continent} onChange={setContinent} />
+          <ContinentSelector value={continent} onChange={changeContinent} />
 
           <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-stretch">
             <CountryDropdown

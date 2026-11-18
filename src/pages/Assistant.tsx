@@ -182,6 +182,9 @@ const cleanForSpeech = (text: string) =>
       .trim(),
   );
 
+// Only called from click and voice handlers, never while rendering.
+const messageId = (prefix: 'u' | 'a' | 'q') => `${prefix}-${Date.now()}`;
+
 export const Assistant: React.FC = () => {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -211,19 +214,18 @@ export const Assistant: React.FC = () => {
     messagesRef.current = messages;
   }, [messages]);
 
+  // The mic keeps the callback it started with, so it goes through a ref to reach the current ask().
+  const askRef = useRef<(q: string) => void>(() => {});
   const voice = useVoice({
     onTranscript: (transcript, isFinal) => {
       setInput(transcript);
       if (isFinal) {
-        ask(transcript);
+        askRef.current(transcript);
       }
     },
     onWordBoundary: setReadingWordIndex,
   });
-
-  useEffect(() => {
-    if (!voice.speaking) setActiveSpeakingId(null);
-  }, [voice.speaking]);
+  const speakingId = voice.speaking ? activeSpeakingId : null;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -231,20 +233,6 @@ export const Assistant: React.FC = () => {
       behavior: 'smooth',
     });
   }, [messages, loading]);
-
-  const askedFromUrl = useRef(false);
-  useEffect(() => {
-    if (askedFromUrl.current) return;
-    const q = searchParams.get('q');
-    if (q && q.trim()) {
-      askedFromUrl.current = true;
-      ask(q);
-      const next = new URLSearchParams(searchParams);
-      next.delete('q');
-      setSearchParams(next, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const ask = async (q: string) => {
     const text = q.trim();
@@ -254,8 +242,8 @@ export const Assistant: React.FC = () => {
     const history = messagesRef.current
       .filter((m) => m.kind !== 'quiz')
       .map(({ role, content }) => ({ role, content }));
-    const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', content: text };
-    const aiId = `a-${Date.now()}`;
+    const userMsg: Message = { id: messageId('u'), role: 'user', content: text };
+    const aiId = messageId('a');
     setMessages((prev) => [
       ...prev,
       userMsg,
@@ -340,6 +328,24 @@ export const Assistant: React.FC = () => {
       abortRef.current = null;
     }
   };
+  useEffect(() => {
+    askRef.current = ask;
+  });
+
+  // A ?q= link asks once on arrival. It runs after the effect above, so askRef already holds ask().
+  const askedFromUrl = useRef(false);
+  useEffect(() => {
+    if (askedFromUrl.current) return;
+    const q = searchParams.get('q');
+    if (q && q.trim()) {
+      askedFromUrl.current = true;
+      askRef.current(q);
+      const next = new URLSearchParams(searchParams);
+      next.delete('q');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stopGenerating = () => {
     abortRef.current?.abort();
@@ -357,7 +363,7 @@ export const Assistant: React.FC = () => {
         .reverse()
         .find((m) => m.role === 'user')?.content ?? '';
 
-    const quizId = `q-${Date.now()}`;
+    const quizId = messageId('q');
     if (!apiKey) {
       let message: Message = { id: quizId, role: 'assistant', kind: 'quiz', content: '' };
       try {
@@ -398,7 +404,7 @@ export const Assistant: React.FC = () => {
   };
 
   const handleMessageSpeak = (msg: Message) => {
-    if (activeSpeakingId === msg.id && voice.speaking) {
+    if (speakingId === msg.id) {
       voice.stopSpeaking();
       setActiveSpeakingId(null);
       return;
@@ -543,7 +549,7 @@ export const Assistant: React.FC = () => {
                 {msg.quiz ? (
                   <QuizCard quiz={msg.quiz} />
                 ) : msg.role === 'assistant' ? (
-                  activeSpeakingId === msg.id && msg.plain ? (
+                  speakingId === msg.id && msg.plain ? (
                     renderReadingText(msg.plain, readingWordIndex)
                   ) : (
                     <div className="space-y-1">
@@ -604,7 +610,7 @@ export const Assistant: React.FC = () => {
                         onClick={() => handleMessageSpeak(msg)}
                         className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-slate/25 dark:border-ink-700 text-slate dark:text-mist hover:border-iris-500 hover:text-iris-500 transition-colors"
                       >
-                        {activeSpeakingId === msg.id && voice.speaking ? (
+                        {speakingId === msg.id ? (
                           <>
                             <Square className="w-3 h-3 fill-current" /> Stop
                           </>

@@ -136,7 +136,7 @@ The licence below covers this project's source code only. It does not cover the 
 
 ## Contributing
 
-Issues and pull requests are welcome. Please run `npm run build` before opening a pull request, and keep secrets out of commits (`.env` is git-ignored; use `.env.example` for new variable names).
+Issues and pull requests are welcome. Please run `npm run lint` and `npm run build` before opening a pull request, and keep secrets out of commits (`.env` is git-ignored; use `.env.example` for new variable names).
 
 ## License
 

@@ -18,5 +18,14 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Picking a field out with { field: _field, ...rest } is how we drop it.
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
+      // Each context file exports its provider and its hook together; editing one reloads the page in dev.
+      'react-refresh/only-export-components': [
+        'error',
+        { allowConstantExport: true, allowExportNames: ['useAuth', 'useData', 'useTheme'] },
+      ],
+    },
   },
 ])

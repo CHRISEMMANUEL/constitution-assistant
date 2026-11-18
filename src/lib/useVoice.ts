@@ -43,7 +43,9 @@ export const useVoice = ({
   const RecognitionCtor = getRecognition();
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const onWordBoundaryRef = useRef(onWordBoundary);
-  onWordBoundaryRef.current = onWordBoundary;
+  useEffect(() => {
+    onWordBoundaryRef.current = onWordBoundary;
+  });
   const fallbackTimer = useRef<number | null>(null);
   const clearFallback = () => {
     if (fallbackTimer.current != null) {
